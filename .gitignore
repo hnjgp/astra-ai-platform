@@ -1,0 +1,10 @@
+.env
+.venv/
+aivenv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.vscode/
+*.db
