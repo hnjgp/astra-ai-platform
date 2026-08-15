@@ -1,5 +1,9 @@
 # Astra AI Platform
 
+![Python](https://img.shields.io/badge/python-3.12-blue)
+![FastAPI](https://img.shields.io/badge/FastAPI-backend-green)
+![Status](https://img.shields.io/badge/status-active-development-orange)
+
 > Production-oriented AI engineering platform built with Python and FastAPI, evolving toward RAG, agentic workflows, MCP, evaluation, observability, and cloud deployment.
 
 Astra is a portfolio-grade AI engineering project designed to demonstrate how modern LLM-powered systems are designed, implemented, secured, tested, evaluated, and deployed in a production-oriented environment.
