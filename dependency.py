@@ -1,9 +1,19 @@
 from datetime import datetime, timedelta, timezone
-from config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, API_KEY
+from config import (
+    SECRET_KEY,
+    ALGORITHM,
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+    INTERNAL_API_KEY
+)
 from fastapi import (
     Depends,
     Header,
     HTTPException
+)
+from config import (
+    SECRET_KEY,
+    ALGORITHM,
+    INTERNAL_API_KEY
 )
 
 from fastapi.security import (
@@ -26,12 +36,12 @@ from config import (
 def get_api_key(
     api_key: str = Header()
 ):
-    if api_key == API_KEY:
+    if api_key == INTERNAL_API_KEY:
         return api_key
 
     raise HTTPException(
         status_code=401,
-        detail="unauthorized"
+        detail="invalid api key"
     )
 
 
