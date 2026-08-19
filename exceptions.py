@@ -8,3 +8,6 @@ class UserAlreadyExistsError(Exception):
 
 class InvalidCredentialsError(Exception):
     pass
+
+class LLMError(Exception):
+    pass

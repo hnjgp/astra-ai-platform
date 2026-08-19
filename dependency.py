@@ -22,7 +22,7 @@ from fastapi.security import (
 
 from jose import JWTError, jwt
 
-from database import SessionLocal
+from database import get_db
 
 from models import User
 
@@ -43,16 +43,6 @@ def get_api_key(
         status_code=401,
         detail="invalid api key"
     )
-
-
-def get_db():
-    db = SessionLocal()
-
-    try:
-        yield db
-
-    finally:
-        db.close()
 
 
 def create_access_token(
@@ -79,6 +69,7 @@ def create_access_token(
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl="/users/login"
 )
+optional_oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/users/login", auto_error=False)
 
 
 def get_current_user(
@@ -117,6 +108,23 @@ def get_current_user(
 
     except (JWTError, ValueError):
         raise credentials_exception
+
+
+def get_optional_current_user(
+    token: str | None = Depends(optional_oauth2_scheme),
+    db=Depends(get_db),
+):
+    if token is None:
+        return None
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = payload.get("sub")
+        user = db.get(User, int(user_id)) if user_id is not None else None
+    except (JWTError, ValueError):
+        raise HTTPException(status_code=401, detail="Could not validate credentials")
+    if user is None:
+        raise HTTPException(status_code=401, detail="Could not validate credentials")
+    return user
 
 
 def require_admin(

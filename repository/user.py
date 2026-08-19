@@ -1,47 +1,53 @@
-from sqlalchemy import select
-
+from sqlalchemy.orm import Session
 from models import User
 
 
+
+
 def get_user_by_username(
-    db,
+    db: Session,
     username: str
 ):
-    result = db.execute(
-        select(User).where(
+
+    return (
+        db.query(User)
+        .filter(
             User.username == username
         )
+        .first()
     )
 
-    return result.scalar_one_or_none()
 
 
 def get_user_by_id(
-    db,
+    db: Session,
     user_id: int
 ):
-    return db.get(
-        User,
-        user_id
+
+    return (
+        db.query(User)
+        .filter(
+            User.id == user_id
+        )
+        .first()
     )
 
 
-def get_users(db):
-    result = db.execute(
-        select(User)
-    )
 
-    return result.scalars().all()
+
 
 
 def create_user(
     db,
-    username: str,
-    password: str
+    username,
+    password,
+    role="user"
 ):
+
     user = User(
         username=username,
-        password=password
+        password=password,
+        role=role
     )
 
     db.add(user)
@@ -49,3 +55,12 @@ def create_user(
     db.refresh(user)
 
     return user
+
+
+def get_users(db: Session):
+    return db.query(User).order_by(User.id).all()
+
+
+def delete_user(db: Session, user: User):
+    db.delete(user)
+    db.commit()

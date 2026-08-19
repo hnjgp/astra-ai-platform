@@ -1,6 +1,14 @@
 from datetime import datetime, timedelta, timezone
 
-from jose import jwt
+from fastapi import (
+    Depends,
+    HTTPException,
+    status
+)
+
+from fastapi.security import OAuth2PasswordBearer
+
+from jose import jwt, JWTError
 
 from pwdlib import PasswordHash
 
@@ -14,10 +22,16 @@ from config import (
 password_hash = PasswordHash.recommended()
 
 
+oauth2_scheme = OAuth2PasswordBearer(
+    tokenUrl="/users/login"
+)
+
+
 def hash_password(
     password: str
 ):
     return password_hash.hash(password)
+
 
 
 def verify_password(
@@ -30,14 +44,17 @@ def verify_password(
     )
 
 
+
 def create_access_token(
     data: dict
 ):
+
     to_encode = data.copy()
 
     expire = (
         datetime.now(timezone.utc)
-        + timedelta(
+        +
+        timedelta(
             minutes=ACCESS_TOKEN_EXPIRE_MINUTES
         )
     )
@@ -49,3 +66,44 @@ def create_access_token(
         SECRET_KEY,
         algorithm=ALGORITHM
     )
+
+
+
+def decode_access_token(
+    token: str = Depends(oauth2_scheme)
+):
+
+    try:
+
+        payload = jwt.decode(
+            token,
+            SECRET_KEY,
+            algorithms=[
+                ALGORITHM
+            ]
+        )
+
+        user_id = payload.get("sub")
+
+        if user_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="invalid token",
+                headers={
+                    "WWW-Authenticate": "Bearer"
+                }
+            )
+
+
+        return payload
+
+
+    except JWTError:
+
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="invalid token",
+            headers={
+                "WWW-Authenticate": "Bearer"
+            }
+        )

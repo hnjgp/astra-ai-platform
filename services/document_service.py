@@ -12,12 +12,15 @@ from repository.document import (
 def create_document(
     db,
     title: str,
-    category: str
+    category: str,
+    body: str | None = None,
+    is_private: bool = False,
+    owner_id: int | None = None,
 ):
     return repository_create_document(
         db,
         title,
-        category
+        category, body, is_private, owner_id
     )
 
 
@@ -40,17 +43,9 @@ def get_documents(db):
     return repository_get_documents(db)
 
 
-def update_document(
-    db,
-    document,
-    title: str,
-    category: str
-):
+def update_document(db, document, **changes):
     return repository_update_document(
-        db,
-        document,
-        title,
-        category
+        db, document, **changes
     )
 
 

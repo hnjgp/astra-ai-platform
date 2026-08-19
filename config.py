@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str
 
     OPENAI_API_KEY: str | None = None
+    OPENAI_MODEL: str = "gpt-5.6-luna"
 
     INTERNAL_API_KEY: str | None = None
 
@@ -35,5 +36,6 @@ ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
 DATABASE_URL = settings.DATABASE_URL
 
 OPENAI_API_KEY = settings.OPENAI_API_KEY
+OPENAI_MODEL = settings.OPENAI_MODEL
 
 INTERNAL_API_KEY = settings.INTERNAL_API_KEY

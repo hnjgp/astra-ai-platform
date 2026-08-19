@@ -1,37 +1,14 @@
-from sqlalchemy import select
-
 from models import Document
 
 
-def get_document_by_id(
-    db,
-    document_id: int
-):
-    result = db.execute(
-        select(Document).where(
-            Document.id == document_id
-        )
-    )
+def create_document(db, title, category, body=None, is_private=False, owner_id=None):
 
-    return result.scalar_one_or_none()
-
-
-def get_documents(db):
-    result = db.execute(
-        select(Document)
-    )
-
-    return result.scalars().all()
-
-
-def create_document(
-    db,
-    title: str,
-    category: str
-):
     document = Document(
         title=title,
-        category=category
+        category=category,
+        body=body,
+        is_private=is_private,
+        owner_id=owner_id,
     )
 
     db.add(document)
@@ -41,14 +18,35 @@ def create_document(
     return document
 
 
-def update_document(
+
+def get_documents(db):
+
+    return db.query(Document).all()
+
+
+
+
+
+
+def get_document_by_id(
     db,
-    document,
-    title: str,
-    category: str
+    document_id
 ):
-    document.title = title
-    document.category = category
+    return (
+        db.query(Document)
+        .filter(
+            Document.id == document_id
+        )
+        .first()
+    )
+
+
+
+def update_document(db, document, **changes):
+
+    for field, value in changes.items():
+        if value is not None:
+            setattr(document, field, value)
 
     db.commit()
     db.refresh(document)
@@ -56,9 +54,9 @@ def update_document(
     return document
 
 
-def delete_document(
-    db,
-    document
-):
+def delete_document(db, document):
+
     db.delete(document)
     db.commit()
+
+    return document

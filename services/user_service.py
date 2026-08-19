@@ -1,8 +1,12 @@
-from exceptions import (
-    UserAlreadyExistsError,
-    InvalidCredentialsError
-)
+from fastapi import HTTPException, status
 
+from repository.user import (
+    get_user_by_username,
+    create_user,
+    get_user_by_id,
+    get_users,
+    delete_user as repository_delete_user,
+)
 
 from security import (
     hash_password,
@@ -10,10 +14,8 @@ from security import (
     create_access_token
 )
 
-from repository.user import (
-    get_user_by_username,
-    create_user
-)
+from models import User
+from exceptions import InvalidCredentialsError
 
 
 def register_user(
@@ -26,20 +28,25 @@ def register_user(
         username
     )
 
-    if existing_user is not None:
+    if existing_user:
+        from exceptions import UserAlreadyExistsError
         raise UserAlreadyExistsError()
 
-    hashed_password = hash_password(
-        password
+    user = User(
+        username=username,
+        password=hash_password(password),
+        role="user"
     )
 
-    user = create_user(
-        db,
-        username,
-        hashed_password
-    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
 
-    return user
+    return {
+        "id": user.id,
+        "username": user.username,
+        "role": user.role
+    }
 
 
 def authenticate_user(
@@ -47,6 +54,7 @@ def authenticate_user(
     username: str,
     password: str
 ):
+
     user = get_user_by_username(
         db,
         username
@@ -55,13 +63,16 @@ def authenticate_user(
     if user is None:
         raise InvalidCredentialsError()
 
+
     if not verify_password(
         password,
         user.password
     ):
         raise InvalidCredentialsError()
 
+
     return user
+
 
 
 def login_user(
@@ -69,44 +80,74 @@ def login_user(
     username: str,
     password: str
 ):
+
     user = authenticate_user(
         db,
         username,
         password
     )
 
-    access_token = create_access_token({
-        "sub": str(user.id)
-    })
 
-    return access_token
+    token = create_access_token(
+        {
+            "sub": str(user.id),
+            "role": user.role
+        }
+    )
+
+    return token
 
 
 
-def create_admin(
+def create_admin_user(
     db,
     username: str,
     password: str
 ):
+
     existing_user = get_user_by_username(
         db,
         username
     )
 
-    if existing_user is not None:
+    if existing_user:
+        from exceptions import UserAlreadyExistsError
         raise UserAlreadyExistsError()
 
-    hashed_password = hash_password(password)
 
-    user = create_user(
-        db,
-        username,
-        hashed_password
+    user = User(
+        username=username,
+        password=hash_password(password),
+        role="admin"
     )
 
-    user.role = "admin"
 
+    db.add(user)
     db.commit()
     db.refresh(user)
 
     return user
+
+
+# Public service API used by the user router and administrative workflows.
+def create_admin(
+    db,
+    username: str,
+    password: str
+):
+    return create_admin_user(db, username, password)
+
+
+def list_users(db):
+    return get_users(db)
+
+
+def set_user_role(db, user: User, role: str):
+    user.role = role
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def remove_user(db, user: User):
+    repository_delete_user(db, user)
