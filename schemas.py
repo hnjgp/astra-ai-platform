@@ -1,5 +1,5 @@
 import re
-
+from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
@@ -90,3 +90,21 @@ class AIGenerateRequest(BaseModel):
 class AIGenerateResponse(BaseModel):
     answer: str
 
+
+
+class AIChatRequest(APIModel):
+    messages: list[AIMessage] = Field(min_length=1)
+
+class AIMessage(APIModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1)
+
+    @field_validator("content")
+    @classmethod
+    def validate_content(cls, value: str) -> str:
+        value = value.strip()
+
+        if not value:
+            raise ValueError("message content cannot be empty")
+
+        return value

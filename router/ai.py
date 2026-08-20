@@ -1,9 +1,11 @@
 from fastapi import APIRouter
-
-from schemas import AIGenerateRequest, AIGenerateResponse
 from services.ai_service import AIService
 from llm.client import LLMClient
-
+from schemas import (
+    AIGenerateRequest,
+    AIGenerateResponse,
+    AIChatRequest,
+)
 
 router = APIRouter(
     prefix="/ai",
@@ -22,6 +24,18 @@ ai_service = AIService(llm_client)
 def generate(request: AIGenerateRequest):
 
     answer = ai_service.generate(request.message)
+
+    return AIGenerateResponse(
+        answer=answer
+    )
+
+@router.post(
+    "/chat",
+    response_model=AIGenerateResponse,
+)
+def chat(request: AIChatRequest):
+
+    answer = ai_service.chat(request.messages)
 
     return AIGenerateResponse(
         answer=answer

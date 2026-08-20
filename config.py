@@ -26,6 +26,10 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
+SYSTEM_PROMPT: str = (
+    "You are Astra, a Persian AI engineering assistant. "
+    "Explain technical concepts clearly and simply in Farsi."
+)
 
 SECRET_KEY = settings.SECRET_KEY
 

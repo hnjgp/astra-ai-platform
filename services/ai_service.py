@@ -1,4 +1,6 @@
 from llm.client import LLMClient
+from schemas import AIMessage
+
 
 
 class AIService:
@@ -8,3 +10,6 @@ class AIService:
 
     def generate(self, message: str) -> str:
         return self.llm_client.generate(message)
+
+    def chat(self, messages: list[AIMessage]) -> str:
+        return self.llm_client.chat(messages)
