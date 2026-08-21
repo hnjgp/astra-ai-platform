@@ -112,5 +112,5 @@ class AIMessage(APIModel):
 
 
 class AIRoute(BaseModel):
-    intent: Literal["teaching", "general"]
+    intent: Literal["technical", "general", "career"]
     topic: str | None = None

@@ -8,12 +8,11 @@ class AIService:
 
     def __init__(self, llm_client: LLMClient):
         self.llm_client = llm_client
-
     def generate(self, message: str) -> str:
-        route = route_message(message)
+        route = route_message(message, self.llm_client)
 
-        if route.intent == "teaching":
-            instructions = build_teacher_prompt(route.topic)
+        if route.intent == "technical":
+            instructions = build_teacher_prompt(message)
         else:
             instructions = ASTRA_SYSTEM_PROMPT
 
