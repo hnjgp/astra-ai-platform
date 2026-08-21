@@ -2,18 +2,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-
     SECRET_KEY: str
-
     ALGORITHM: str = "HS256"
-
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-
     DATABASE_URL: str
-
     OPENAI_API_KEY: str | None = None
     OPENAI_MODEL: str = "gpt-5.6-luna"
-
     INTERNAL_API_KEY: str | None = None
 
 
@@ -25,12 +19,6 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-
-SYSTEM_PROMPT: str = (
-    "You are Astra, a Persian AI engineering assistant. "
-    "Explain technical concepts clearly and simply in Farsi."
-)
-
 SECRET_KEY = settings.SECRET_KEY
 
 ALGORITHM = settings.ALGORITHM

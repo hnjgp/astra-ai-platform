@@ -1,6 +1,7 @@
 from llm.client import LLMClient
+from prompts.ai import ASTRA_SYSTEM_PROMPT, build_teacher_prompt
+from prompts.router import route_message
 from schemas import AIMessage
-
 
 
 class AIService:
@@ -9,7 +10,17 @@ class AIService:
         self.llm_client = llm_client
 
     def generate(self, message: str) -> str:
-        return self.llm_client.generate(message)
+        route = route_message(message)
+
+        if route.intent == "teaching":
+            instructions = build_teacher_prompt(route.topic)
+        else:
+            instructions = ASTRA_SYSTEM_PROMPT
+
+        return self.llm_client.generate(
+            message=message,
+            instructions=instructions,
+        )
 
     def chat(self, messages: list[AIMessage]) -> str:
         return self.llm_client.chat(messages)

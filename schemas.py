@@ -108,3 +108,9 @@ class AIMessage(APIModel):
             raise ValueError("message content cannot be empty")
 
         return value
+
+
+
+class AIRoute(BaseModel):
+    intent: Literal["teaching", "general"]
+    topic: str | None = None
