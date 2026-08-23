@@ -1,4 +1,6 @@
 from fastapi import APIRouter
+from fastapi.responses import StreamingResponse
+
 from services.ai_service import AIService
 from llm.client import LLMClient
 from schemas import (
@@ -6,6 +8,7 @@ from schemas import (
     AIGenerateResponse,
     AIChatRequest,
 )
+
 
 router = APIRouter(
     prefix="/ai",
@@ -29,6 +32,7 @@ def generate(request: AIGenerateRequest):
         answer=answer
     )
 
+
 @router.post(
     "/chat",
     response_model=AIGenerateResponse,
@@ -39,4 +43,15 @@ def chat(request: AIChatRequest):
 
     return AIGenerateResponse(
         answer=answer
+    )
+
+
+@router.post(
+    "/chat/stream",
+)
+def chat_stream(request: AIChatRequest):
+
+    return StreamingResponse(
+        ai_service.chat_stream(request.messages),
+        media_type="text/plain",
     )

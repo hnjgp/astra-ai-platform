@@ -65,3 +65,9 @@ class AIService:
             )
 
             raise
+
+    def chat_stream(
+        self,
+        messages: list[AIMessage],
+    ):
+        yield from self.llm_client.chat_stream(messages)
