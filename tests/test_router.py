@@ -8,18 +8,24 @@ llm_client = LLMClient()
 messages = [
     "Docker چیست؟",
     "Docker رو از پایه برام توضیح بده",
-    "یه توضیح ساده درباره Redis می‌خوام",
-    "FastAPI چطور کار می‌کند؟",
-    "سلام، حالت چطوره؟",
+    "من با Docker و Kubernetes کار کردم ولی معماری container orchestration رو عمیق توضیح بده",
     "برای مصاحبه AI Engineer چطور آماده شوم؟",
-    "برای رزومه AI Engineer چه چیزهایی بنویسم؟",
+    "سلام، حالت چطوره؟",
 ]
 
 
 for message in messages:
-    result = route_message(message, llm_client)
 
-    print("=" * 50)
+    print("=" * 60)
     print("MESSAGE:", message)
-    print("INTENT:", result.intent)
-    print("TOPIC:", result.topic)
+
+    route = route_message(
+        message,
+        llm_client,
+    )
+
+    print("\nROUTE:")
+    print("intent:", route.intent)
+    print("topic:", route.topic)
+    print("level:", route.level)
+    print("language:", route.language)
