@@ -206,3 +206,12 @@ class AIRoute(APIModel):
     ] | None = None
 
     language: str | None = None
+
+
+
+
+
+class ServiceInfoInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    service_name: str

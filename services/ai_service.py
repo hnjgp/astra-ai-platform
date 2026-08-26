@@ -10,7 +10,7 @@ from prompts.router import route_message
 
 from exceptions import LLMError
 
-from tools.executor import execute_tool
+from tools.executor import ToolExecutor
 from tools.registry import get_tool_definitions
 
 
@@ -18,6 +18,7 @@ class AIService:
 
     def __init__(self, llm_client):
         self.llm_client = llm_client
+        self.tool_executor = ToolExecutor()
 
     def generate(
         self,
@@ -96,7 +97,7 @@ class AIService:
                 .generate_with_tool_execution(
                     message=message,
                     tools=tool_definitions,
-                    tool_executor=execute_tool,
+                    tool_executor=self.tool_executor.execute,
                     max_tool_rounds=max_tool_rounds,
                     instructions=ASTRA_SYSTEM_PROMPT,
                 )

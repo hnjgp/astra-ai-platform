@@ -1,21 +1,15 @@
-from exceptions import LLMError
-from tools.executor import execute_tool
+from tools.executor import ToolExecutor
+
+
+executor = ToolExecutor()
 
 
 try:
-
-    execute_tool(
+    executor.execute(
         tool_name="unknown_tool",
-        arguments="{}",
+        arguments={},
     )
+    assert False, "Expected KeyError for unknown tool"
 
-    raise AssertionError(
-        "Expected LLMError"
-    )
-
-except LLMError as exc:
-
-    assert str(exc) == "Unknown tool: unknown_tool"
-
-
-print("TEST: Unknown Tool PASS")
+except KeyError:
+    print("TEST: Unknown Tool Error PASS")

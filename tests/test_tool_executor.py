@@ -1,14 +1,14 @@
-from tools.executor import execute_tool
+from tools.executor import ToolExecutor
 
 
-result = execute_tool(
+executor = ToolExecutor()
+
+result = executor.execute(
     tool_name="get_system_status",
-    arguments="{}",
+    arguments={},
 )
-
 
 assert result["service"] == "Astra"
 assert result["status"] == "healthy"
-
 
 print("TEST: Tool Executor PASS")

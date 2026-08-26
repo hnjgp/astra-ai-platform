@@ -1,7 +1,10 @@
+import json
+
 from openai import OpenAI
 
 from config import OPENAI_API_KEY, OPENAI_MODEL
-from tools.executor import execute_tool
+
+from tools.executor import ToolExecutor
 
 
 client = OpenAI(
@@ -47,9 +50,13 @@ print("ARGUMENTS:", tool_call.arguments)
 print("CALL ID:", tool_call.call_id)
 
 
-result = execute_tool(
+arguments = json.loads(tool_call.arguments)
+
+executor = ToolExecutor()
+
+result = executor.execute(
     tool_name=tool_call.name,
-    arguments=tool_call.arguments,
+    arguments=arguments,
 )
 
 

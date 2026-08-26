@@ -1,40 +1,33 @@
+from tools.base import BaseTool
 from tools.system import (
-    get_service_version,
-    get_system_status,
+    ServiceVersionTool,
+    SystemStatusTool,
+    ServiceInfoTool,
 )
 
-
-TOOL_REGISTRY = {
-    "get_system_status": get_system_status,
-    "get_service_version": get_service_version,
+TOOL_REGISTRY: dict[str, BaseTool] = {
+    "get_system_status": SystemStatusTool(),
+    "get_service_version": ServiceVersionTool(),
+    "get_service_info": ServiceInfoTool(),
 }
 
+def get_tool(tool_name: str) -> BaseTool:
+    """
+    Return a registered tool by name.
+    """
+    tool = TOOL_REGISTRY.get(tool_name)
 
-TOOL_DEFINITIONS = [
-    {
-        "type": "function",
-        "name": "get_system_status",
-        "description": "Get the current status of Astra.",
-        "parameters": {
-            "type": "object",
-            "properties": {},
-            "required": [],
-            "additionalProperties": False,
-        },
-    },
-    {
-        "type": "function",
-        "name": "get_service_version",
-        "description": "Get the current version of Astra.",
-        "parameters": {
-            "type": "object",
-            "properties": {},
-            "required": [],
-            "additionalProperties": False,
-        },
-    },
-]
+    if tool is None:
+        raise KeyError(f"Unknown tool: {tool_name}")
+
+    return tool
 
 
 def get_tool_definitions() -> list[dict]:
-    return TOOL_DEFINITIONS
+    """
+    Return all registered tool definitions for the LLM.
+    """
+    return [
+        tool.to_definition()
+        for tool in TOOL_REGISTRY.values()
+    ]
