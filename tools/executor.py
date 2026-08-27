@@ -1,6 +1,8 @@
 import json
 from typing import Any
 
+from pydantic import ValidationError
+
 from tools.registry import get_tool
 
 
@@ -23,13 +25,25 @@ class ToolExecutor:
         if isinstance(arguments, str):
             arguments = json.loads(arguments)
 
-        return tool.execute(**arguments)
+        try:
+            return tool.execute(**arguments)
+
+        except ValidationError:
+            raise
+
+        except Exception as exc:
+            return {
+                "success": False,
+                "tool_name": tool_name,
+                "error": str(exc),
+            }
 
 
 def execute_tool(
     tool_name: str,
     arguments: dict[str, Any] | str | None = None,
 ) -> Any:
+
     executor = ToolExecutor()
 
     return executor.execute(
