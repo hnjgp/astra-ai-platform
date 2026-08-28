@@ -5,8 +5,8 @@ from openai import (
     APIStatusError,
     AuthenticationError,
     BadRequestError,
-    RateLimitError,
     OpenAI,
+    RateLimitError,
 )
 
 from config import OPENAI_API_KEY, OPENAI_MODEL
@@ -22,6 +22,10 @@ class LLMClient:
             api_key=OPENAI_API_KEY
         )
 
+    # ============================================================
+    # Basic Generate
+    # ============================================================
+
     def generate(
         self,
         message: str,
@@ -29,6 +33,7 @@ class LLMClient:
     ) -> str:
 
         try:
+
             response = self.client.responses.create(
                 model=OPENAI_MODEL,
                 instructions=instructions,
@@ -41,29 +46,38 @@ class LLMClient:
             return response.output_text
 
         except AuthenticationError as exc:
+
             raise LLMError(
                 "LLM authentication failed"
             ) from exc
 
         except RateLimitError as exc:
+
             raise LLMError(
                 "LLM rate limit exceeded"
             ) from exc
 
         except BadRequestError as exc:
+
             raise LLMError(
                 "Invalid LLM request"
             ) from exc
 
         except APIConnectionError as exc:
+
             raise LLMError(
                 "Could not connect to LLM provider"
             ) from exc
 
         except APIStatusError as exc:
+
             raise LLMError(
                 "LLM provider returned an error"
             ) from exc
+
+    # ============================================================
+    # Chat
+    # ============================================================
 
     def chat(
         self,
@@ -71,6 +85,7 @@ class LLMClient:
     ) -> str:
 
         try:
+
             response = self.client.responses.create(
                 model=OPENAI_MODEL,
                 instructions=ASTRA_SYSTEM_PROMPT,
@@ -89,29 +104,38 @@ class LLMClient:
             return response.output_text
 
         except AuthenticationError as exc:
+
             raise LLMError(
                 "LLM authentication failed"
             ) from exc
 
         except RateLimitError as exc:
+
             raise LLMError(
                 "LLM rate limit exceeded"
             ) from exc
 
         except BadRequestError as exc:
+
             raise LLMError(
                 "Invalid LLM request"
             ) from exc
 
         except APIConnectionError as exc:
+
             raise LLMError(
                 "Could not connect to LLM provider"
             ) from exc
 
         except APIStatusError as exc:
+
             raise LLMError(
                 "LLM provider returned an error"
             ) from exc
+
+    # ============================================================
+    # Streaming Chat
+    # ============================================================
 
     def chat_stream(
         self,
@@ -119,6 +143,7 @@ class LLMClient:
     ) -> Iterator[str]:
 
         try:
+
             stream = self.client.responses.create(
                 model=OPENAI_MODEL,
                 instructions=ASTRA_SYSTEM_PROMPT,
@@ -135,32 +160,42 @@ class LLMClient:
             for event in stream:
 
                 if event.type == "response.output_text.delta":
+
                     yield event.delta
 
         except AuthenticationError as exc:
+
             raise LLMError(
                 "LLM authentication failed"
             ) from exc
 
         except RateLimitError as exc:
+
             raise LLMError(
                 "LLM rate limit exceeded"
             ) from exc
 
         except BadRequestError as exc:
+
             raise LLMError(
                 "Invalid LLM request"
             ) from exc
 
         except APIConnectionError as exc:
+
             raise LLMError(
                 "Could not connect to LLM provider"
             ) from exc
 
         except APIStatusError as exc:
+
             raise LLMError(
                 "LLM provider returned an error"
             ) from exc
+
+    # ============================================================
+    # Generate With Tools
+    # ============================================================
 
     def generate_with_tools(
         self,
@@ -170,6 +205,7 @@ class LLMClient:
     ):
 
         try:
+
             response = self.client.responses.create(
                 model=OPENAI_MODEL,
                 instructions=(
@@ -183,29 +219,38 @@ class LLMClient:
             return response
 
         except AuthenticationError as exc:
+
             raise LLMError(
                 "LLM authentication failed"
             ) from exc
 
         except RateLimitError as exc:
+
             raise LLMError(
                 "LLM rate limit exceeded"
             ) from exc
 
         except BadRequestError as exc:
+
             raise LLMError(
                 "Invalid LLM request"
             ) from exc
 
         except APIConnectionError as exc:
+
             raise LLMError(
                 "Could not connect to LLM provider"
             ) from exc
 
         except APIStatusError as exc:
+
             raise LLMError(
                 "LLM provider returned an error"
             ) from exc
+
+    # ============================================================
+    # Generate With Tool Execution
+    # ============================================================
 
     def generate_with_tool_execution(
         self,
@@ -239,7 +284,12 @@ class LLMClient:
                     if item.type == "function_call"
                 ]
 
+                # ------------------------------------------------
+                # Model finished without requesting another tool
+                # ------------------------------------------------
+
                 if not tool_calls:
+
                     return response.output_text
 
                 print()
@@ -248,6 +298,10 @@ class LLMClient:
                 )
 
                 tool_outputs = []
+
+                # ------------------------------------------------
+                # Execute requested tools
+                # ------------------------------------------------
 
                 for tool_call in tool_calls:
 
@@ -271,55 +325,75 @@ class LLMClient:
                         result,
                     )
 
+                    # ------------------------------------------------
+                    # ToolResult -> JSON
+                    #
+                    # The LLM receives a stable JSON contract instead
+                    # of Python object representation.
+                    # ------------------------------------------------
+
                     tool_outputs.append(
                         {
-                            "type": (
-                                "function_call_output"
+                            "type": "function_call_output",
+                            "call_id": tool_call.call_id,
+                            "output": (
+                                result.model_dump_json()
                             ),
-                            "call_id": (
-                                tool_call.call_id
-                            ),
-                            "output": str(result),
                         }
                     )
 
-                response = (
-                    self.client.responses.create(
-                        model=OPENAI_MODEL,
-                        instructions=(
-                            instructions
-                            or ASTRA_SYSTEM_PROMPT
-                        ),
-                        input=tool_outputs,
-                        previous_response_id=response.id,
-                    )
+                # ------------------------------------------------
+                # Send tool results back to the model
+                #
+                # Keep tools available so the model can request
+                # another tool in the next round.
+                # ------------------------------------------------
+
+                response = self.client.responses.create(
+                    model=OPENAI_MODEL,
+                    instructions=(
+                        instructions
+                        or ASTRA_SYSTEM_PROMPT
+                    ),
+                    input=tool_outputs,
+                    previous_response_id=response.id,
+                    tools=tools,
                 )
+
+            # ----------------------------------------------------
+            # Safety limit
+            # ----------------------------------------------------
 
             raise LLMError(
                 "Maximum tool execution rounds exceeded"
             )
 
         except AuthenticationError as exc:
+
             raise LLMError(
                 "LLM authentication failed"
             ) from exc
 
         except RateLimitError as exc:
+
             raise LLMError(
                 "LLM rate limit exceeded"
             ) from exc
 
         except BadRequestError as exc:
+
             raise LLMError(
                 "Invalid LLM request"
             ) from exc
 
         except APIConnectionError as exc:
+
             raise LLMError(
                 "Could not connect to LLM provider"
             ) from exc
 
         except APIStatusError as exc:
+
             raise LLMError(
                 "LLM provider returned an error"
             ) from exc

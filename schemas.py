@@ -1,5 +1,5 @@
 import re
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -79,7 +79,6 @@ class DocumentCreate(APIModel):
             )
 
         return value
-
 
     @field_validator("body")
     @classmethod
@@ -208,10 +207,23 @@ class AIRoute(APIModel):
     language: str | None = None
 
 
-
-
+# ============================================================
+# Tool Schemas
+# ============================================================
 
 class ServiceInfoInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     service_name: str
+
+
+class ToolError(BaseModel):
+    type: str
+    message: str
+
+
+class ToolResult(BaseModel):
+    success: bool
+    tool_name: str
+    data: Any | None = None
+    error: ToolError | None = None

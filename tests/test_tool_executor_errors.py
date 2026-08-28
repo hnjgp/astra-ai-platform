@@ -1,15 +1,17 @@
+import pytest
+
 from tools.executor import ToolExecutor
 
 
-executor = ToolExecutor()
+def test_unknown_tool_error():
 
+    executor = ToolExecutor()
 
-try:
-    executor.execute(
-        tool_name="unknown_tool",
-        arguments={},
-    )
-    assert False, "Expected KeyError for unknown tool"
+    with pytest.raises(KeyError):
 
-except KeyError:
+        executor.execute(
+            tool_name="unknown_tool",
+            arguments={},
+        )
+
     print("TEST: Unknown Tool Error PASS")

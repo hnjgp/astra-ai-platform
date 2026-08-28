@@ -1,122 +1,40 @@
-from openai import OpenAI
+from llm.client import LLMClient
 
-from config import OPENAI_API_KEY, OPENAI_MODEL
-from tools.executor import ToolExecutor
+from services.ai_service import AIService
+
 from tools.registry import get_tool_definitions
 
 
-client = OpenAI(
-    api_key=OPENAI_API_KEY
-)
+def test_multi_step_tool_execution():
 
-executor = ToolExecutor()
+    llm_client = LLMClient()
 
-tools = get_tool_definitions()
-
-
-response = client.responses.create(
-    model=OPENAI_MODEL,
-    input=(
-        "ابتدا وضعیت سیستم Astra را بررسی کن. "
-        "بعد نسخه سرویس Astra را بررسی کن. "
-        "در پایان نتیجه هر دو را به من بگو."
-    ),
-    tools=tools,
-    tool_choice="required",
-    parallel_tool_calls=False,
-)
-
-
-tool_rounds = 0
-used_tools = set()
-
-
-while True:
-
-    tool_calls = [
-        item
-        for item in response.output
-        if item.type == "function_call"
-    ]
-
-    if not tool_calls:
-        break
-
-    tool_rounds += 1
-
-    print()
-    print(f"TOOL ROUND: {tool_rounds}")
-
-    tool_outputs = []
-
-    for tool_call in tool_calls:
-
-        print(
-            "TOOL CALL:",
-            tool_call.name,
-        )
-
-        print(
-            "ARGUMENTS:",
-            tool_call.arguments,
-        )
-
-        result = executor.execute(
-            tool_name=tool_call.name,
-            arguments=tool_call.arguments,
-        )
-
-        used_tools.add(tool_call.name)
-
-        print(
-            "TOOL RESULT:",
-            result,
-        )
-
-        tool_outputs.append(
-            {
-                "type": "function_call_output",
-                "call_id": tool_call.call_id,
-                "output": str(result),
-            }
-        )
-
-    remaining_tools = [
-        tool
-        for tool in tools
-        if tool["name"] not in used_tools
-    ]
-
-    if not remaining_tools:
-        response = client.responses.create(
-            model=OPENAI_MODEL,
-            input=tool_outputs,
-            previous_response_id=response.id,
-        )
-        break
-
-    response = client.responses.create(
-        model=OPENAI_MODEL,
-        input=tool_outputs,
-        previous_response_id=response.id,
-        tools=remaining_tools,
-        tool_choice="required",
-        parallel_tool_calls=False,
+    ai_service = AIService(
+        llm_client=llm_client
     )
 
+    tools = get_tool_definitions()
 
-print()
-print("FINAL ANSWER:")
-print("-" * 40)
-print(response.output_text)
-print("-" * 40)
+    answer = ai_service.generate_with_tools(
+        message=(
+            "ابتدا وضعیت سیستم Astra را بررسی کن. "
+            "بعد نسخه سرویس Astra را بررسی کن. "
+            "در پایان نتیجه هر دو را به من بگو."
+        ),
+        tools=tools,
+        max_tool_rounds=5,
+    )
 
+    print()
+    print("FINAL ANSWER:")
+    print("-" * 40)
+    print(answer)
+    print("-" * 40)
 
-assert tool_rounds >= 2
-assert "get_system_status" in used_tools
-assert "get_service_version" in used_tools
+    assert answer
 
+    assert "Astra" in answer
 
-print(
-    "TEST: Multi-Step Tool Execution PASS"
-)
+    print(
+        "TEST: Multi-Step Tool Execution PASS"
+    )

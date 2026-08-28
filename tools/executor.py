@@ -3,6 +3,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from schemas import ToolError, ToolResult
 from tools.registry import get_tool
 
 
@@ -15,7 +16,7 @@ class ToolExecutor:
         self,
         tool_name: str,
         arguments: dict[str, Any] | str | None = None,
-    ) -> Any:
+    ) -> ToolResult:
 
         tool = get_tool(tool_name)
 
@@ -26,23 +27,34 @@ class ToolExecutor:
             arguments = json.loads(arguments)
 
         try:
-            return tool.execute(**arguments)
+            result = tool.execute(**arguments)
+
+            return ToolResult(
+                success=True,
+                tool_name=tool_name,
+                data=result,
+                error=None,
+            )
 
         except ValidationError:
             raise
 
         except Exception as exc:
-            return {
-                "success": False,
-                "tool_name": tool_name,
-                "error": str(exc),
-            }
+            return ToolResult(
+                success=False,
+                tool_name=tool_name,
+                data=None,
+                error=ToolError(
+                    type="ToolExecutionError",
+                    message=str(exc),
+                ),
+            )
 
 
 def execute_tool(
     tool_name: str,
     arguments: dict[str, Any] | str | None = None,
-) -> Any:
+) -> ToolResult:
 
     executor = ToolExecutor()
 

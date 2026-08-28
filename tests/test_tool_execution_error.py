@@ -26,18 +26,25 @@ class BrokenTool(BaseTool):
         raise RuntimeError("Database connection failed")
 
 
-TOOL_REGISTRY["broken_tool"] = BrokenTool()
+def test_tool_execution_error():
 
-executor = ToolExecutor()
+    TOOL_REGISTRY["broken_tool"] = BrokenTool()
 
-result = executor.execute(
-    tool_name="broken_tool",
-    arguments={},
-)
+    executor = ToolExecutor()
 
-assert result["success"] is False
-assert result["tool_name"] == "broken_tool"
-assert "Database connection failed" in result["error"]
+    result = executor.execute(
+        tool_name="broken_tool",
+        arguments={},
+    )
 
-print("RESULT:", result)
+    assert result.success is False
+    assert result.tool_name == "broken_tool"
+
+    assert result.data is None
+    assert result.error is not None
+
+    assert result.error.type == "ToolExecutionError"
+    assert "Database connection failed" in result.error.message
+
+
 print("TEST: Tool Execution Error Handling PASS")

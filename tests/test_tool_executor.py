@@ -1,14 +1,21 @@
 from tools.executor import ToolExecutor
 
 
-executor = ToolExecutor()
+def test_tool_executor():
 
-result = executor.execute(
-    tool_name="get_system_status",
-    arguments={},
-)
+    executor = ToolExecutor()
 
-assert result["service"] == "Astra"
-assert result["status"] == "healthy"
+    result = executor.execute(
+        tool_name="get_system_status",
+        arguments={},
+    )
 
-print("TEST: Tool Executor PASS")
+    print("RESULT:", result)
+
+    assert result.success is True
+    assert result.tool_name == "get_system_status"
+    assert result.data["service"] == "Astra"
+    assert result.data["status"] == "healthy"
+    assert result.error is None
+
+    print("TEST: Tool Executor PASS")
