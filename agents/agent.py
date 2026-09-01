@@ -1,4 +1,5 @@
-from typing import Callable
+import json
+from typing import Any, Callable
 
 from exceptions import LLMError
 from schemas import ToolResult
@@ -65,29 +66,32 @@ class Agent:
                     arguments=tool_call.arguments,
                 )
 
-                if isinstance(result, ToolResult):
-                    output = result.model_dump()
-                else:
-                    output = result
-
                 print(
                     "TOOL RESULT:",
                     result,
                 )
 
+                if isinstance(result, ToolResult):
+                    output = result.model_dump()
+                else:
+                    output = result
+
                 tool_outputs.append(
                     {
                         "type": "function_call_output",
                         "call_id": tool_call.call_id,
-                        "output": str(output),
+                        "output": json.dumps(
+                            output,
+                            ensure_ascii=False,
+                        ),
                     }
                 )
 
             response = self.llm_client.generate_with_tools(
                 message=tool_outputs,
                 tools=tools,
-                previous_response_id=response.id,
                 instructions=instructions,
+                previous_response_id=response.id,
             )
 
         raise LLMError(

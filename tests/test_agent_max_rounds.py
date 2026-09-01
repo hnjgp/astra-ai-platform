@@ -1,14 +1,29 @@
-from types import SimpleNamespace
-
 import pytest
 
 from agents.agent import Agent
 from exceptions import LLMError
 
 
-class InfiniteToolLLM:
+class FakeToolCall:
 
-    counter = 0
+    type = "function_call"
+    name = "get_system_status"
+    arguments = "{}"
+    call_id = "call_123"
+
+
+class FakeResponse:
+
+    output = [
+        FakeToolCall()
+    ]
+
+    output_text = ""
+
+    id = "response_1"
+
+
+class FakeLLM:
 
     def generate_with_tools(
         self,
@@ -18,53 +33,32 @@ class InfiniteToolLLM:
         previous_response_id=None,
     ):
 
-        self.counter += 1
-
-        return SimpleNamespace(
-            id=f"response_{self.counter}",
-            output=[
-                SimpleNamespace(
-                    type="function_call",
-                    name="get_system_status",
-                    arguments="{}",
-                    call_id=f"call_{self.counter}",
-                )
-            ],
-            output_text="",
-        )
-
-
-def fake_executor(
-    tool_name,
-    arguments,
-):
-
-    return {
-        "success": True,
-        "tool_name": tool_name,
-        "data": {
-            "status": "healthy",
-        },
-        "error": None,
-    }
+        return FakeResponse()
 
 
 def test_agent_max_tool_rounds():
 
     agent = Agent(
-        llm_client=InfiniteToolLLM(),
-        tool_executor=fake_executor,
+        llm_client=FakeLLM(),
+        tool_executor=lambda **kwargs: {
+            "success": True,
+            "tool_name": "get_system_status",
+            "data": {
+                "status": "healthy"
+            },
+            "error": None,
+        },
     )
 
     with pytest.raises(LLMError):
 
         agent.run(
-            message="test",
+            message="وضعیت سیستم را بررسی کن.",
             tools=[
                 {
                     "type": "function",
                     "name": "get_system_status",
-                    "description": "Get status.",
+                    "description": "Get system status.",
                     "parameters": {
                         "type": "object",
                         "properties": {},

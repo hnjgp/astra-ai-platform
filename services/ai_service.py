@@ -1,5 +1,7 @@
 from schemas import AIMessage
 
+from agents.agent import Agent
+
 from prompts.ai import (
     ASTRA_SYSTEM_PROMPT,
     build_teacher_prompt,
@@ -10,7 +12,6 @@ from prompts.router import route_message
 
 from exceptions import LLMError
 
-from agents.agent import Agent
 from tools.executor import ToolExecutor
 from tools.registry import get_tool_definitions
 

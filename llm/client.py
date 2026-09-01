@@ -29,22 +29,14 @@ class LLMClient:
     ) -> str:
 
         try:
-
             response = self.client.responses.create(
                 model=OPENAI_MODEL,
                 instructions=instructions,
                 input=message,
             )
 
-            print(
-                "MODEL:",
-                response.model,
-            )
-
-            print(
-                "USAGE:",
-                response.usage,
-            )
+            print("MODEL:", response.model)
+            print("USAGE:", response.usage)
 
             return response.output_text
 
@@ -79,7 +71,6 @@ class LLMClient:
     ) -> str:
 
         try:
-
             response = self.client.responses.create(
                 model=OPENAI_MODEL,
                 instructions=ASTRA_SYSTEM_PROMPT,
@@ -92,15 +83,8 @@ class LLMClient:
                 ],
             )
 
-            print(
-                "MODEL:",
-                response.model,
-            )
-
-            print(
-                "USAGE:",
-                response.usage,
-            )
+            print("MODEL:", response.model)
+            print("USAGE:", response.usage)
 
             return response.output_text
 
@@ -135,7 +119,6 @@ class LLMClient:
     ) -> Iterator[str]:
 
         try:
-
             stream = self.client.responses.create(
                 model=OPENAI_MODEL,
                 instructions=ASTRA_SYSTEM_PROMPT,
@@ -151,9 +134,7 @@ class LLMClient:
 
             for event in stream:
 
-                if event.type == (
-                    "response.output_text.delta"
-                ):
+                if event.type == "response.output_text.delta":
                     yield event.delta
 
         except AuthenticationError as exc:
@@ -190,24 +171,15 @@ class LLMClient:
     ):
 
         try:
-
-            kwargs = {
-                "model": OPENAI_MODEL,
-                "instructions": (
+            response = self.client.responses.create(
+                model=OPENAI_MODEL,
+                instructions=(
                     instructions
                     or ASTRA_SYSTEM_PROMPT
                 ),
-                "input": message,
-                "tools": tools,
-            }
-
-            if previous_response_id is not None:
-                kwargs["previous_response_id"] = (
-                    previous_response_id
-                )
-
-            response = self.client.responses.create(
-                **kwargs
+                input=message,
+                tools=tools,
+                previous_response_id=previous_response_id,
             )
 
             return response

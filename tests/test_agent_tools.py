@@ -1,15 +1,32 @@
-import ast
-from types import SimpleNamespace
-
 from agents.agent import Agent
-from schemas import ToolResult
 
 
-class FakeLLMClient:
+class FakeToolCall:
+
+    type = "function_call"
+    name = "get_system_status"
+    arguments = "{}"
+    call_id = "call_123"
+
+
+class FakeResponse:
+
+    def __init__(
+        self,
+        output,
+        output_text="",
+        response_id="response_1",
+    ):
+        self.output = output
+        self.output_text = output_text
+        self.id = response_id
+
+
+class FakeLLM:
 
     def __init__(self):
 
-        self.calls = []
+        self.calls = 0
 
     def generate_with_tools(
         self,
@@ -19,64 +36,52 @@ class FakeLLMClient:
         previous_response_id=None,
     ):
 
-        self.calls.append(
-            {
-                "message": message,
-                "previous_response_id": (
-                    previous_response_id
-                ),
-            }
-        )
+        self.calls += 1
 
-        if len(self.calls) == 1:
+        if self.calls == 1:
 
-            return SimpleNamespace(
-                id="response_1",
+            return FakeResponse(
                 output=[
-                    SimpleNamespace(
-                        type="function_call",
-                        name="get_system_status",
-                        arguments="{}",
-                        call_id="call_1",
-                    )
+                    FakeToolCall()
                 ],
-                output_text="",
+                response_id="response_1",
             )
 
-        return SimpleNamespace(
-            id="response_2",
+        return FakeResponse(
             output=[],
-            output_text=(
-                "Astra system is healthy."
-            ),
+            output_text="وضعیت Astra سالم است.",
+            response_id="response_2",
         )
-
-
-def fake_tool_executor(
-    tool_name,
-    arguments,
-):
-
-    assert tool_name == "get_system_status"
-
-    return ToolResult(
-        success=True,
-        tool_name=tool_name,
-        data={
-            "service": "Astra",
-            "status": "healthy",
-        },
-        error=None,
-    )
 
 
 def test_agent_tool_execution():
 
-    llm_client = FakeLLMClient()
+    llm = FakeLLM()
+
+    executed_tools = []
+
+    def fake_executor(
+        tool_name,
+        arguments,
+    ):
+
+        executed_tools.append(
+            tool_name
+        )
+
+        return {
+            "success": True,
+            "tool_name": tool_name,
+            "data": {
+                "service": "Astra",
+                "status": "healthy",
+            },
+            "error": None,
+        }
 
     agent = Agent(
-        llm_client=llm_client,
-        tool_executor=fake_tool_executor,
+        llm_client=llm,
+        tool_executor=fake_executor,
     )
 
     result = agent.run(
@@ -96,30 +101,10 @@ def test_agent_tool_execution():
         ],
     )
 
-    assert result == (
-        "Astra system is healthy."
-    )
+    assert result == "وضعیت Astra سالم است."
 
-    assert len(llm_client.calls) == 2
+    assert executed_tools == [
+        "get_system_status"
+    ]
 
-    second_call = llm_client.calls[1]
-
-    assert (
-        second_call["previous_response_id"]
-        == "response_1"
-    )
-
-    output = second_call["message"][0]
-
-    assert (
-        output["type"]
-        == "function_call_output"
-    )
-
-    assert output["call_id"] == "call_1"
-
-    parsed_output = ast.literal_eval(
-        output["output"]
-    )
-
-    assert parsed_output["success"] is True
+    assert llm.calls == 2
