@@ -10,6 +10,7 @@ from prompts.router import route_message
 
 from exceptions import LLMError
 
+from agents.agent import Agent
 from tools.executor import ToolExecutor
 from tools.registry import get_tool_definitions
 
@@ -17,8 +18,15 @@ from tools.registry import get_tool_definitions
 class AIService:
 
     def __init__(self, llm_client):
+
         self.llm_client = llm_client
+
         self.tool_executor = ToolExecutor()
+
+        self.agent = Agent(
+            llm_client=self.llm_client,
+            tool_executor=self.tool_executor.execute,
+        )
 
     def generate(
         self,
@@ -54,9 +62,11 @@ class AIService:
             )
 
         except LLMError:
+
             print(
                 "AIService error: LLMError"
             )
+
             raise
 
         except Exception as exc:
@@ -92,15 +102,11 @@ class AIService:
                     message
                 )
 
-            return (
-                self.llm_client
-                .generate_with_tool_execution(
-                    message=message,
-                    tools=tool_definitions,
-                    tool_executor=self.tool_executor.execute,
-                    max_tool_rounds=max_tool_rounds,
-                    instructions=ASTRA_SYSTEM_PROMPT,
-                )
+            return self.agent.run(
+                message=message,
+                tools=tool_definitions,
+                max_tool_rounds=max_tool_rounds,
+                instructions=ASTRA_SYSTEM_PROMPT,
             )
 
         except LLMError:
