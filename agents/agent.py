@@ -16,6 +16,89 @@ class Agent:
         self.llm_client = llm_client
         self.tool_executor = tool_executor
 
+    def _get_tool_calls(
+        self,
+        response,
+    ) -> list[Any]:
+        """
+        Extract tool calls from the model response.
+        """
+
+        return [
+            item
+            for item in response.output
+            if item.type == "function_call"
+        ]
+
+    def _execute_tool_round(
+        self,
+        state: AgentState,
+    ) -> list[dict]:
+        """
+        Execute all tool calls from the current round.
+        """
+
+        state.round_number += 1
+        state.tool_outputs = []
+
+        print(
+            f"TOOL ROUND: {state.round_number}"
+        )
+
+        tool_outputs = []
+
+        for tool_call in state.tool_calls:
+            print(
+                "TOOL CALL:",
+                tool_call.name,
+            )
+
+            print(
+                "ARGUMENTS:",
+                tool_call.arguments,
+            )
+
+            result = self.tool_executor(
+                tool_name=tool_call.name,
+                arguments=tool_call.arguments,
+            )
+
+            print(
+                "TOOL RESULT:",
+                result,
+            )
+
+            if isinstance(result, ToolResult):
+                output = result.model_dump()
+            else:
+                output = result
+
+            tool_outputs.append(
+                {
+                    "type": "function_call_output",
+                    "call_id": tool_call.call_id,
+                    "output": json.dumps(
+                        output,
+                        ensure_ascii=False,
+                    ),
+                }
+            )
+
+        state.set_tool_outputs(tool_outputs)
+
+        return state.tool_outputs
+
+    def _is_terminal_response(
+        self,
+        response,
+    ) -> bool:
+        """
+        Return True when the model produced a final response
+        without requesting any tool.
+        """
+
+        return not self._get_tool_calls(response)
+
     def run(
         self,
         message: str,
@@ -41,64 +124,14 @@ class Agent:
         state.update_response_id(response.id)
 
         for _ in range(
-            1,
-            state.max_tool_rounds + 1,
+            state.max_tool_rounds
         ):
-            tool_calls = [
-                item
-                for item in response.output
-                if item.type == "function_call"
-            ]
-
-            if not tool_calls:
+            if self._is_terminal_response(response):
                 return response.output_text
 
-            state.start_tool_round(tool_calls)
+            state.tool_calls = self._get_tool_calls(response)
 
-            print(
-                f"TOOL ROUND: {state.round_number}"
-            )
-
-            tool_outputs = []
-
-            for tool_call in state.tool_calls:
-                print(
-                    "TOOL CALL:",
-                    tool_call.name,
-                )
-
-                print(
-                    "ARGUMENTS:",
-                    tool_call.arguments,
-                )
-
-                result = self.tool_executor(
-                    tool_name=tool_call.name,
-                    arguments=tool_call.arguments,
-                )
-
-                print(
-                    "TOOL RESULT:",
-                    result,
-                )
-
-                if isinstance(result, ToolResult):
-                    output = result.model_dump()
-                else:
-                    output = result
-
-                tool_outputs.append(
-                    {
-                        "type": "function_call_output",
-                        "call_id": tool_call.call_id,
-                        "output": json.dumps(
-                            output,
-                            ensure_ascii=False,
-                        ),
-                    }
-                )
-
-            state.set_tool_outputs(tool_outputs)
+            self._execute_tool_round(state)
 
             state.current_message = state.tool_outputs
 
