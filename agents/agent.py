@@ -4,9 +4,10 @@ from typing import Any, Callable
 from exceptions import LLMError
 from schemas import ToolResult
 
+from agents.state import AgentState
+
 
 class Agent:
-
     def __init__(
         self,
         llm_client,
@@ -23,17 +24,26 @@ class Agent:
         instructions: str | None = None,
     ) -> str:
 
-        response = self.llm_client.generate_with_tools(
-            message=message,
+        state = AgentState(
+            original_message=message,
+            current_message=message,
             tools=tools,
             instructions=instructions,
+            max_tool_rounds=max_tool_rounds,
         )
 
-        for round_number in range(
-            1,
-            max_tool_rounds + 1,
-        ):
+        response = self.llm_client.generate_with_tools(
+            message=state.current_message,
+            tools=state.tools,
+            instructions=state.instructions,
+        )
 
+        state.update_response_id(response.id)
+
+        for _ in range(
+            1,
+            state.max_tool_rounds + 1,
+        ):
             tool_calls = [
                 item
                 for item in response.output
@@ -43,14 +53,15 @@ class Agent:
             if not tool_calls:
                 return response.output_text
 
+            state.start_tool_round(tool_calls)
+
             print(
-                f"TOOL ROUND: {round_number}"
+                f"TOOL ROUND: {state.round_number}"
             )
 
             tool_outputs = []
 
-            for tool_call in tool_calls:
-
+            for tool_call in state.tool_calls:
                 print(
                     "TOOL CALL:",
                     tool_call.name,
@@ -87,12 +98,18 @@ class Agent:
                     }
                 )
 
+            state.set_tool_outputs(tool_outputs)
+
+            state.current_message = state.tool_outputs
+
             response = self.llm_client.generate_with_tools(
-                message=tool_outputs,
-                tools=tools,
-                instructions=instructions,
-                previous_response_id=response.id,
+                message=state.current_message,
+                tools=state.tools,
+                instructions=state.instructions,
+                previous_response_id=state.previous_response_id,
             )
+
+            state.update_response_id(response.id)
 
         raise LLMError(
             "Maximum tool execution rounds exceeded"
