@@ -4,6 +4,7 @@ from typing import Any, Callable
 from exceptions import LLMError
 from schemas import ToolResult
 
+from agents.context import AgentContext
 from agents.state import AgentState
 
 
@@ -20,9 +21,6 @@ class Agent:
         self,
         response,
     ) -> list[Any]:
-        """
-        Extract tool calls from the model response.
-        """
 
         return [
             item
@@ -33,13 +31,12 @@ class Agent:
     def _execute_tool_round(
         self,
         state: AgentState,
+        context: AgentContext,
     ) -> list[dict]:
-        """
-        Execute all tool calls from the current round.
-        """
 
-        state.round_number += 1
-        state.tool_outputs = []
+        state.start_tool_round(
+            state.tool_calls
+        )
 
         print(
             f"TOOL ROUND: {state.round_number}"
@@ -48,6 +45,7 @@ class Agent:
         tool_outputs = []
 
         for tool_call in state.tool_calls:
+
             print(
                 "TOOL CALL:",
                 tool_call.name,
@@ -84,18 +82,16 @@ class Agent:
                 }
             )
 
-        state.set_tool_outputs(tool_outputs)
+        context.set_tool_outputs(
+            tool_outputs
+        )
 
-        return state.tool_outputs
+        return context.tool_outputs
 
     def _is_terminal_response(
         self,
         response,
     ) -> bool:
-        """
-        Return True when the model produced a final response
-        without requesting any tool.
-        """
 
         return not self._get_tool_calls(response)
 
@@ -107,42 +103,62 @@ class Agent:
         instructions: str | None = None,
     ) -> str:
 
-        state = AgentState(
+        context = AgentContext(
             original_message=message,
-            current_message=message,
             tools=tools,
             instructions=instructions,
-            max_tool_rounds=max_tool_rounds,
+        )
+
+        state = AgentState(
+            current_message=message,
         )
 
         response = self.llm_client.generate_with_tools(
             message=state.current_message,
-            tools=state.tools,
-            instructions=state.instructions,
+            tools=context.tools,
+            instructions=context.instructions,
         )
 
-        state.update_response_id(response.id)
+        state.update_response_id(
+            response.id
+        )
 
         for _ in range(
-            state.max_tool_rounds
+            max_tool_rounds
         ):
-            if self._is_terminal_response(response):
+
+            if self._is_terminal_response(
+                response
+            ):
                 return response.output_text
 
-            state.tool_calls = self._get_tool_calls(response)
-
-            self._execute_tool_round(state)
-
-            state.current_message = state.tool_outputs
-
-            response = self.llm_client.generate_with_tools(
-                message=state.current_message,
-                tools=state.tools,
-                instructions=state.instructions,
-                previous_response_id=state.previous_response_id,
+            state.tool_calls = (
+                self._get_tool_calls(response)
             )
 
-            state.update_response_id(response.id)
+            self._execute_tool_round(
+                state=state,
+                context=context,
+            )
+
+            state.current_message = (
+                context.tool_outputs
+            )
+
+            response = (
+                self.llm_client.generate_with_tools(
+                    message=state.current_message,
+                    tools=context.tools,
+                    instructions=context.instructions,
+                    previous_response_id=(
+                        state.previous_response_id
+                    ),
+                )
+            )
+
+            state.update_response_id(
+                response.id
+            )
 
         raise LLMError(
             "Maximum tool execution rounds exceeded"
