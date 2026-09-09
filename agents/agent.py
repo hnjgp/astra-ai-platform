@@ -1,3 +1,5 @@
+# agents/agent.py
+
 import json
 from typing import Any, Callable
 
@@ -86,7 +88,7 @@ class Agent:
             tool_outputs
         )
 
-        return context.tool_outputs
+        return context.build_next_model_context()
 
     def _is_terminal_response(
         self,
@@ -142,7 +144,7 @@ class Agent:
             )
 
             state.current_message = (
-                context.tool_outputs
+                context.build_next_model_context()
             )
 
             response = (

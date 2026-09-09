@@ -1,11 +1,14 @@
+# tests/test_stream_api.py
+
 import time
 
+import pytest
 import requests
 
 
-url = "http://127.0.0.1:8000/ai/chat/stream"
+URL = "http://127.0.0.1:8000/ai/chat/stream"
 
-payload = {
+PAYLOAD = {
     "messages": [
         {
             "role": "user",
@@ -15,76 +18,76 @@ payload = {
 }
 
 
-print("STREAM START")
-print("-" * 40)
+def test_stream_api():
 
+    try:
+        requests.get(
+            "http://127.0.0.1:8000/health",
+            timeout=2,
+        )
+    except requests.RequestException:
+        pytest.skip(
+            "API server is not running on 127.0.0.1:8000"
+        )
 
-start_time = time.perf_counter()
+    start_time = time.perf_counter()
 
-first_chunk_time = None
-chunk_count = 0
+    first_chunk_time = None
+    chunk_count = 0
 
+    with requests.post(
+        URL,
+        json=PAYLOAD,
+        stream=True,
+        timeout=60,
+    ) as response:
 
-with requests.post(
-    url,
-    json=payload,
-    stream=True,
-) as response:
+        assert response.status_code == 200
 
-    print("STATUS:", response.status_code)
+        for chunk in response.iter_content(
+            chunk_size=None,
+            decode_unicode=True,
+        ):
 
-    response.raise_for_status()
+            if chunk:
 
-    for chunk in response.iter_content(
-        chunk_size=None,
-        decode_unicode=True,
-    ):
+                chunk_count += 1
 
-        if chunk:
-
-            chunk_count += 1
-
-            if first_chunk_time is None:
-                first_chunk_time = time.perf_counter()
-
-                ttft = (
-                    first_chunk_time
-                    - start_time
-                )
+                if first_chunk_time is None:
+                    first_chunk_time = (
+                        time.perf_counter()
+                    )
 
                 print(
-                    f"\n\nFIRST CHUNK: {ttft:.3f}s"
+                    chunk,
+                    end="",
+                    flush=True,
                 )
 
-            print(
-                chunk,
-                end="",
-                flush=True,
-            )
+    end_time = time.perf_counter()
 
+    total_time = (
+        end_time
+        - start_time
+    )
 
-end_time = time.perf_counter()
+    assert chunk_count > 0
+    assert first_chunk_time is not None
 
-total_time = (
-    end_time
-    - start_time
-)
+    ttft = (
+        first_chunk_time
+        - start_time
+    )
 
-
-print()
-print("-" * 40)
-print("STREAM END")
-
-print(
-    f"CHUNKS: {chunk_count}"
-)
-
-print(
-    f"TOTAL TIME: {total_time:.3f}s"
-)
-
-if first_chunk_time is not None:
-
+    print()
+    print("-" * 40)
+    print("STREAM END")
     print(
-        f"TTFT: {first_chunk_time - start_time:.3f}s"
+        f"CHUNKS: {chunk_count}"
+    )
+    print(
+        f"TOTAL TIME: {total_time:.3f}s"
+    )
+    print(
+        f"TTFT: {ttft:.3f}s"
     )
