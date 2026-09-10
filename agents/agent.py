@@ -7,6 +7,7 @@ from exceptions import LLMError
 from schemas import ToolResult
 
 from agents.context import AgentContext
+from agents.memory_manager import MemoryManager
 from agents.state import AgentState
 
 
@@ -15,9 +16,11 @@ class Agent:
         self,
         llm_client,
         tool_executor: Callable,
+        memory_manager: MemoryManager | None = None,
     ):
         self.llm_client = llm_client
         self.tool_executor = tool_executor
+        self.memory_manager = memory_manager
 
     def _get_tool_calls(
         self,
@@ -97,12 +100,43 @@ class Agent:
 
         return not self._get_tool_calls(response)
 
+    def _build_initial_message(
+        self,
+        message: str,
+        memory_key: str | None,
+    ) -> list[dict]:
+
+        user_message = {
+            "role": "user",
+            "content": message,
+        }
+
+        if (
+            self.memory_manager is None
+            or memory_key is None
+        ):
+            return [
+                user_message
+            ]
+
+        memory_context = (
+            self.memory_manager.build_context(
+                memory_key
+            )
+        )
+
+        return [
+            *memory_context,
+            user_message,
+        ]
+
     def run(
         self,
         message: str,
         tools: list[dict],
         max_tool_rounds: int = 5,
         instructions: str | None = None,
+        memory_key: str | None = None,
     ) -> str:
 
         context = AgentContext(
@@ -115,8 +149,15 @@ class Agent:
             current_message=message,
         )
 
+        initial_message = (
+            self._build_initial_message(
+                message=message,
+                memory_key=memory_key,
+            )
+        )
+
         response = self.llm_client.generate_with_tools(
-            message=state.current_message,
+            message=initial_message,
             tools=context.tools,
             instructions=context.instructions,
         )
