@@ -15,7 +15,6 @@ def test_create_document(client):
     assert response.json()["category"] == "AI"
 
 
-
 def test_get_documents(client):
 
     client.post(
@@ -26,16 +25,13 @@ def test_get_documents(client):
         }
     )
 
-
     response = client.get(
         "/documents/"
     )
 
-
     assert response.status_code == 200
 
     assert len(response.json()) == 1
-
 
 
 def test_get_document(client):
@@ -48,19 +44,15 @@ def test_get_document(client):
         }
     )
 
-
     document_id = create_response.json()["id"]
-
 
     response = client.get(
         f"/documents/{document_id}"
     )
 
-
     assert response.status_code == 200
 
     assert response.json()["id"] == document_id
-
 
 
 def test_get_document_not_found(client):
@@ -69,9 +61,7 @@ def test_get_document_not_found(client):
         "/documents/999"
     )
 
-
     assert response.status_code == 404
-
 
 
 def test_create_document_without_title(client):
@@ -83,9 +73,7 @@ def test_create_document_without_title(client):
         }
     )
 
-
     assert response.status_code == 422
-
 
 
 def test_create_document_without_category(client):
@@ -97,9 +85,7 @@ def test_create_document_without_category(client):
         }
     )
 
-
     assert response.status_code == 422
-
 
 
 def test_update_document(client):
@@ -112,9 +98,7 @@ def test_update_document(client):
         }
     )
 
-
     document_id = create_response.json()["id"]
-
 
     response = client.put(
         f"/documents/{document_id}",
@@ -124,13 +108,11 @@ def test_update_document(client):
         }
     )
 
-
     assert response.status_code == 200
 
     assert response.json()["title"] == "new title"
 
     assert response.json()["category"] == "ML"
-
 
 
 def test_delete_document_without_admin(client):
@@ -143,17 +125,13 @@ def test_delete_document_without_admin(client):
         }
     )
 
-
     document_id = create_response.json()["id"]
-
 
     response = client.delete(
         f"/documents/{document_id}"
     )
 
-
     assert response.status_code == 401
-
 
 
 def test_secure_document_without_permission(client):
@@ -166,13 +144,52 @@ def test_secure_document_without_permission(client):
         }
     )
 
-
     document_id = create_response.json()["id"]
-
 
     response = client.get(
         f"/documents/secure/{document_id}"
     )
 
-
     assert response.status_code == 401
+
+
+def test_upload_document(client):
+
+    response = client.post(
+        "/documents/upload",
+        files={
+            "file": (
+                "test.txt",
+                b"This is a test document for Astra RAG.",
+                "text/plain",
+            )
+        },
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["title"] == "test"
+
+    assert data["category"] == "uploaded"
+
+    assert data["body"] == (
+        "This is a test document for Astra RAG."
+    )
+
+
+def test_upload_unsupported_document_type(client):
+
+    response = client.post(
+        "/documents/upload",
+        files={
+            "file": (
+                "test.exe",
+                b"invalid document",
+                "application/octet-stream",
+            )
+        },
+    )
+
+    assert response.status_code == 400
