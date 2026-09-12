@@ -233,8 +233,15 @@ def test_missing_secret_key(monkeypatch):
 
 def test_database_url_configuration():
     from config import Settings
-    assert Settings(_env_file=None, SECRET_KEY="test", DATABASE_URL="sqlite:///configured.db").DATABASE_URL.endswith("configured.db")
 
+    settings = Settings(
+        _env_file=None,
+        SECRET_KEY="test",
+        DATABASE_URL="sqlite:///configured.db",
+        RAG_DATABASE_URL="postgresql+psycopg://test:test@localhost:5433/test",
+    )
+
+    assert settings.DATABASE_URL.endswith("configured.db")
 
 def test_error_response_format_and_sensitive_data(client):
     response = register(client)

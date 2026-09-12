@@ -6,10 +6,10 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     DATABASE_URL: str
+    RAG_DATABASE_URL: str
     OPENAI_API_KEY: str | None = None
     OPENAI_MODEL: str = "gpt-5.6-luna"
     INTERNAL_API_KEY: str | None = None
-
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -19,13 +19,13 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
 SECRET_KEY = settings.SECRET_KEY
-
 ALGORITHM = settings.ALGORITHM
-
 ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
 
 DATABASE_URL = settings.DATABASE_URL
+RAG_DATABASE_URL = settings.RAG_DATABASE_URL
 
 OPENAI_API_KEY = settings.OPENAI_API_KEY
 OPENAI_MODEL = settings.OPENAI_MODEL

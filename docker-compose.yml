@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: astra-postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: astra
+      POSTGRES_USER: astra
+      POSTGRES_PASSWORD: astra_password
+
+    ports:
+      - "5433:5432"
+
+    volumes:
+      - astra_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  astra_postgres_data:
