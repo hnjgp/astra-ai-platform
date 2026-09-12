@@ -1,44 +1,34 @@
 from pathlib import Path
 
 from rag.chunking.chunker import DocumentChunker
+from rag.embeddings.embedder import Embedder
 from rag.ingestion.loader import DocumentLoader
+from rag.models import EmbeddedChunk
 
 
 class RAGPipeline:
-    """
-    Load a document and split its text into chunks.
-    """
-
     def __init__(
         self,
         loader: DocumentLoader | None = None,
         chunker: DocumentChunker | None = None,
-    ) -> None:
+        embedder: Embedder | None = None,
+    ):
+        self.loader = loader or DocumentLoader()
+        self.chunker = chunker or DocumentChunker()
+        self.embedder = embedder
 
-        self.loader = (
-            loader
-            if loader is not None
-            else DocumentLoader()
-        )
+    def process(self, path: Path) -> list[EmbeddedChunk]:
+        text = self.loader.load(path)
 
-        self.chunker = (
-            chunker
-            if chunker is not None
-            else DocumentChunker()
-        )
+        chunks = self.chunker.split(text)
 
-    def process(
-        self,
-        file_path: str | Path,
-    ) -> list[str]:
-        """
-        Load a document and return its chunks.
-        """
+        if self.embedder is None:
+            raise ValueError("embedder is required")
 
-        text = self.loader.load(
-            file_path
-        )
-
-        return self.chunker.split(
-            text
-        )
+        return [
+            EmbeddedChunk(
+                text=chunk,
+                embedding=self.embedder.embed(chunk),
+            )
+            for chunk in chunks
+        ]
