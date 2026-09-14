@@ -9,6 +9,9 @@ from sqlalchemy.pool import StaticPool
 from database import Base, get_db
 from main import app
 
+from rag.database import RAGSessionLocal
+from rag.models import DocumentChunk
+
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
 
@@ -35,11 +38,12 @@ def enable_foreign_keys(dbapi_connection, _connection_record):
     cursor.execute("PRAGMA foreign_keys=ON")
     cursor.close()
 
+
 # The administrative test helper imports SessionLocal at runtime.  Point it at
 # the same isolated database used by the API dependency override.
 import database
-database.SessionLocal = TestingSessionLocal
 
+database.SessionLocal = TestingSessionLocal
 
 
 @pytest.fixture(autouse=True)
@@ -47,6 +51,7 @@ def setup_database():
 
     from main import RateLimitMiddleware
     from router.user import _failed_logins
+
     RateLimitMiddleware.requests.clear()
     _failed_logins.clear()
 
@@ -61,6 +66,24 @@ def setup_database():
     )
 
 
+@pytest.fixture
+def rag_db_session():
+    db = RAGSessionLocal()
+
+    try:
+        db.query(DocumentChunk).delete()
+        db.commit()
+
+        yield db
+
+    finally:
+        db.rollback()
+
+        db.query(DocumentChunk).delete()
+        db.commit()
+
+        db.close()
+
 
 def override_get_db():
 
@@ -70,7 +93,6 @@ def override_get_db():
         yield db
     finally:
         db.close()
-
 
 
 app.dependency_overrides[get_db] = override_get_db
