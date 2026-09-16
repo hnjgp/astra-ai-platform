@@ -35,6 +35,7 @@ class RAGService:
             top_k=top_k,
             document_id=document_id,
             score_threshold=score_threshold,
+            query=question,
         )
 
         context = self.context_builder.build(

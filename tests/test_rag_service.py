@@ -10,6 +10,7 @@ def test_rag_service_builds_prompt_from_question():
     context_builder = Mock()
     prompt_builder = Mock()
 
+    question = "What is Python?"
     query_embedding = [0.1, 0.2, 0.3]
 
     embedder.embed.return_value = query_embedding
@@ -49,7 +50,7 @@ def test_rag_service_builds_prompt_from_question():
     )
 
     prompt = service.build_prompt(
-        question="What is Python?"
+        question=question
     )
 
     assert prompt == (
@@ -57,7 +58,7 @@ def test_rag_service_builds_prompt_from_question():
     )
 
     embedder.embed.assert_called_once_with(
-        "What is Python?"
+        question
     )
 
     retrieval_service.search.assert_called_once_with(
@@ -65,6 +66,7 @@ def test_rag_service_builds_prompt_from_question():
         top_k=5,
         document_id=None,
         score_threshold=None,
+        query=question,
     )
 
     context_builder.build.assert_called_once_with(
@@ -81,6 +83,8 @@ def test_rag_service_passes_retrieval_options():
     retrieval_service = Mock()
     context_builder = Mock()
     prompt_builder = Mock()
+
+    question = "What is Python?"
 
     embedder.embed.return_value = [0.1, 0.2]
 
@@ -105,7 +109,7 @@ def test_rag_service_passes_retrieval_options():
     )
 
     service.build_prompt(
-        question="What is Python?",
+        question=question,
         top_k=3,
         document_id=10,
         score_threshold=0.8,
@@ -116,6 +120,7 @@ def test_rag_service_passes_retrieval_options():
         top_k=3,
         document_id=10,
         score_threshold=0.8,
+        query=question,
     )
 
 
@@ -124,6 +129,8 @@ def test_rag_service_builds_prompt_when_no_context_is_found():
     retrieval_service = Mock()
     context_builder = Mock()
     prompt_builder = Mock()
+
+    question = "What is the vacation policy?"
 
     embedder.embed.return_value = [0.1, 0.2]
 
@@ -148,7 +155,7 @@ def test_rag_service_builds_prompt_when_no_context_is_found():
     )
 
     prompt = service.build_prompt(
-        question="What is the vacation policy?"
+        question=question
     )
 
     assert prompt == (
@@ -160,6 +167,7 @@ def test_rag_service_builds_prompt_when_no_context_is_found():
         top_k=5,
         document_id=None,
         score_threshold=None,
+        query=question,
     )
 
     context_builder.build.assert_called_once_with(
