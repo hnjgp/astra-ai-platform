@@ -1,5 +1,3 @@
-# agents/agent.py
-
 import json
 from typing import Any, Callable
 
@@ -9,6 +7,7 @@ from schemas import ToolResult
 from agents.context import AgentContext
 from agents.memory_manager import MemoryManager
 from agents.state import AgentState
+from rag.service import RAGService
 
 
 class Agent:
@@ -17,10 +16,12 @@ class Agent:
         llm_client,
         tool_executor: Callable,
         memory_manager: MemoryManager | None = None,
+        rag_service: RAGService | None = None,
     ):
         self.llm_client = llm_client
         self.tool_executor = tool_executor
         self.memory_manager = memory_manager
+        self.rag_service = rag_service
 
     def _get_tool_calls(
         self,
@@ -130,6 +131,35 @@ class Agent:
             user_message,
         ]
 
+    def _build_instructions(
+        self,
+        instructions: str | None,
+        message: str,
+        use_rag: bool,
+    ) -> str | None:
+
+        rag_prompt = None
+
+        if use_rag:
+            if self.rag_service is None:
+                raise ValueError(
+                    "rag_service is required when use_rag is True"
+                )
+
+            rag_prompt = (
+                self.rag_service.build_prompt(
+                    question=message,
+                )
+            )
+
+        if instructions and rag_prompt:
+            return (
+                f"{instructions}\n\n"
+                f"{rag_prompt}"
+            )
+
+        return instructions or rag_prompt
+
     def run(
         self,
         message: str,
@@ -137,6 +167,7 @@ class Agent:
         max_tool_rounds: int = 5,
         instructions: str | None = None,
         memory_key: str | None = None,
+        use_rag: bool = False,
     ) -> str:
 
         context = AgentContext(
@@ -155,6 +186,16 @@ class Agent:
                 memory_key=memory_key,
             )
         )
+
+        model_instructions = (
+            self._build_instructions(
+                instructions=instructions,
+                message=message,
+                use_rag=use_rag,
+            )
+        )
+
+        context.instructions = model_instructions
 
         response = self.llm_client.generate_with_tools(
             message=initial_message,
