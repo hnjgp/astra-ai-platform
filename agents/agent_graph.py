@@ -9,6 +9,7 @@ class AgentGraphState(TypedDict):
     initial_message: list[dict]
     response: Any | None
     max_tool_rounds: int
+    error: str | None
 
 
 def build_agent_graph(
@@ -55,6 +56,7 @@ def build_agent_graph(
 
         return {
             "response": response,
+            "error": None,
         }
 
     def route_after_model(
@@ -80,16 +82,71 @@ def build_agent_graph(
     def tools_node(
         graph_state: AgentGraphState,
     ) -> dict:
-        agent._execute_tool_round(
-            state=state,
-            context=context,
+        try:
+            agent._execute_tool_round(
+                state=state,
+                context=context,
+            )
+
+            state.current_message = (
+                context.build_next_model_context()
+            )
+
+            return {
+                "error": None,
+            }
+
+        except (
+            TimeoutError,
+            ConnectionError,
+        ) as error:
+            return {
+                "error": str(error),
+            }
+
+    def route_after_tools(
+        graph_state: AgentGraphState,
+    ) -> str:
+        if graph_state["error"] is not None:
+            return "recovery"
+
+        return "model"
+
+    def recovery_node(
+        graph_state: AgentGraphState,
+    ) -> dict:
+        error_message = graph_state["error"]
+
+        if error_message is None:
+            raise LLMError(
+                "Recovery error is missing"
+            )
+
+        tool_outputs = []
+
+        for tool_call in state.tool_calls:
+            tool_outputs.append(
+                {
+                    "type": "function_call_output",
+                    "call_id": tool_call.call_id,
+                    "output": (
+                        "Tool execution failed. "
+                        f"Error: {error_message}"
+                    ),
+                }
+            )
+
+        context.set_tool_outputs(
+            tool_outputs
         )
 
         state.current_message = (
             context.build_next_model_context()
         )
 
-        return {}
+        return {
+            "error": None,
+        }
 
     graph = StateGraph(
         AgentGraphState
@@ -103,6 +160,11 @@ def build_agent_graph(
     graph.add_node(
         "tools",
         tools_node,
+    )
+
+    graph.add_node(
+        "recovery",
+        recovery_node,
     )
 
     graph.add_edge(
@@ -119,8 +181,17 @@ def build_agent_graph(
         },
     )
 
-    graph.add_edge(
+    graph.add_conditional_edges(
         "tools",
+        route_after_tools,
+        {
+            "model": "model",
+            "recovery": "recovery",
+        },
+    )
+
+    graph.add_edge(
+        "recovery",
         "model",
     )
 
