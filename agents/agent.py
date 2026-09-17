@@ -1,13 +1,13 @@
 import json
 from typing import Any, Callable
 
-from exceptions import LLMError
-from schemas import ToolResult
-
+from agents.agent_graph import build_agent_graph
 from agents.context import AgentContext
 from agents.memory_manager import MemoryManager
 from agents.state import AgentState
+from exceptions import LLMError
 from rag.service import RAGService
+from schemas import ToolResult
 
 
 class Agent:
@@ -197,53 +197,33 @@ class Agent:
 
         context.instructions = model_instructions
 
-        response = self.llm_client.generate_with_tools(
-            message=initial_message,
-            tools=context.tools,
-            instructions=context.instructions,
+        graph = build_agent_graph(
+            agent=self,
+            context=context,
+            state=state,
+            initial_message=initial_message,
+            max_tool_rounds=max_tool_rounds,
         )
 
-        state.update_response_id(
-            response.id
+        result = graph.invoke(
+            {
+                "initial_message": initial_message,
+                "response": None,
+                "max_tool_rounds": max_tool_rounds,
+            },
+            config={
+                "recursion_limit": max(
+                    25,
+                    max_tool_rounds * 4 + 5,
+                ),
+            },
         )
 
-        for _ in range(
-            max_tool_rounds
-        ):
+        response = result["response"]
 
-            if self._is_terminal_response(
-                response
-            ):
-                return response.output_text
-
-            state.tool_calls = (
-                self._get_tool_calls(response)
+        if response is None:
+            raise LLMError(
+                "Agent model response is missing"
             )
 
-            self._execute_tool_round(
-                state=state,
-                context=context,
-            )
-
-            state.current_message = (
-                context.build_next_model_context()
-            )
-
-            response = (
-                self.llm_client.generate_with_tools(
-                    message=state.current_message,
-                    tools=context.tools,
-                    instructions=context.instructions,
-                    previous_response_id=(
-                        state.previous_response_id
-                    ),
-                )
-            )
-
-            state.update_response_id(
-                response.id
-            )
-
-        raise LLMError(
-            "Maximum tool execution rounds exceeded"
-        )
+        return response.output_text
