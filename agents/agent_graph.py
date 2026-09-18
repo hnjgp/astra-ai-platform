@@ -1,31 +1,40 @@
 from typing import Any, TypedDict
 
 from agents.context import AgentContext
-from agents.state import AgentState
 from exceptions import LLMError
 
 
 class AgentGraphState(TypedDict):
     initial_message: list[dict]
-    response: Any | None
+    current_message: list[dict]
     max_tool_rounds: int
+    round_number: int
+    previous_response_id: str | None
+    tool_calls: list[dict]
+    output_text: str | None
     error: str | None
 
 
 def build_agent_graph(
     agent,
     context: AgentContext,
-    state: AgentState,
     initial_message: list[dict],
     max_tool_rounds: int,
+    checkpointer=None,
 ):
     from langgraph.graph import END, START, StateGraph
 
     def model_node(
         graph_state: AgentGraphState,
-    ) -> dict:
-        if state.previous_response_id is None:
-            message = graph_state["initial_message"]
+    ) -> dict[str, Any]:
+
+        if (
+            graph_state["previous_response_id"]
+            is None
+        ):
+            message = graph_state[
+                "initial_message"
+            ]
 
             response = (
                 agent.llm_client.generate_with_tools(
@@ -34,8 +43,11 @@ def build_agent_graph(
                     instructions=context.instructions,
                 )
             )
+
         else:
-            message = state.current_message
+            message = graph_state[
+                "current_message"
+            ]
 
             response = (
                 agent.llm_client.generate_with_tools(
@@ -43,36 +55,37 @@ def build_agent_graph(
                     tools=context.tools,
                     instructions=context.instructions,
                     previous_response_id=(
-                        state.previous_response_id
+                        graph_state[
+                            "previous_response_id"
+                        ]
                     ),
                 )
             )
 
-        state.update_response_id(response.id)
-
-        state.tool_calls = (
-            agent._get_tool_calls(response)
+        tool_calls = (
+            agent._serialize_tool_calls(
+                response
+            )
         )
 
         return {
-            "response": response,
+            "previous_response_id": response.id,
+            "tool_calls": tool_calls,
+            "output_text": response.output_text,
             "error": None,
         }
 
     def route_after_model(
         graph_state: AgentGraphState,
     ) -> str:
-        response = graph_state["response"]
 
-        if response is None:
-            raise LLMError(
-                "Agent model response is missing"
-            )
-
-        if agent._is_terminal_response(response):
+        if not graph_state["tool_calls"]:
             return "end"
 
-        if state.round_number >= max_tool_rounds:
+        if (
+            graph_state["round_number"]
+            >= graph_state["max_tool_rounds"]
+        ):
             raise LLMError(
                 "Maximum tool execution rounds exceeded"
             )
@@ -81,18 +94,24 @@ def build_agent_graph(
 
     def tools_node(
         graph_state: AgentGraphState,
-    ) -> dict:
-        try:
-            agent._execute_tool_round(
-                state=state,
-                context=context,
-            )
+    ) -> dict[str, Any]:
 
-            state.current_message = (
-                context.build_next_model_context()
+        try:
+            next_message = (
+                agent._execute_tool_round(
+                    tool_calls=graph_state[
+                        "tool_calls"
+                    ],
+                    context=context,
+                )
             )
 
             return {
+                "current_message": next_message,
+                "round_number": (
+                    graph_state["round_number"]
+                    + 1
+                ),
                 "error": None,
             }
 
@@ -107,6 +126,7 @@ def build_agent_graph(
     def route_after_tools(
         graph_state: AgentGraphState,
     ) -> str:
+
         if graph_state["error"] is not None:
             return "recovery"
 
@@ -114,7 +134,8 @@ def build_agent_graph(
 
     def recovery_node(
         graph_state: AgentGraphState,
-    ) -> dict:
+    ) -> dict[str, Any]:
+
         error_message = graph_state["error"]
 
         if error_message is None:
@@ -124,11 +145,15 @@ def build_agent_graph(
 
         tool_outputs = []
 
-        for tool_call in state.tool_calls:
+        for tool_call in graph_state[
+            "tool_calls"
+        ]:
             tool_outputs.append(
                 {
                     "type": "function_call_output",
-                    "call_id": tool_call.call_id,
+                    "call_id": tool_call[
+                        "call_id"
+                    ],
                     "output": (
                         "Tool execution failed. "
                         f"Error: {error_message}"
@@ -140,11 +165,10 @@ def build_agent_graph(
             tool_outputs
         )
 
-        state.current_message = (
-            context.build_next_model_context()
-        )
-
         return {
+            "current_message": (
+                context.build_next_model_context()
+            ),
             "error": None,
         }
 
@@ -195,4 +219,6 @@ def build_agent_graph(
         "model",
     )
 
-    return graph.compile()
+    return graph.compile(
+        checkpointer=checkpointer,
+    )

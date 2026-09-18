@@ -74,3 +74,6 @@ websockets==16.1.1
 psycopg[binary]==3.3.5
 pgvector==0.5.0
 langgraph==1.2.11
+langgraph==1.2.11
+langgraph-checkpoint-postgres==3.1.2
+websockets==16.1.1
