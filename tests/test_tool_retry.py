@@ -4,6 +4,7 @@ import pytest
 
 from tools.base import BaseTool
 from tools.executor import ToolExecutor
+from tools.guardrail import ToolGuardrail
 from tools.retry import RetryPolicy
 
 
@@ -15,9 +16,14 @@ class FlakyTool(BaseTool):
         exception: Exception | None = None,
     ):
         self.calls = 0
-        self.failures_before_success = failures_before_success
-        self.exception = exception or TimeoutError(
-            "temporary timeout"
+        self.failures_before_success = (
+            failures_before_success
+        )
+        self.exception = (
+            exception
+            or TimeoutError(
+                "temporary timeout"
+            )
         )
 
     @property
@@ -26,7 +32,9 @@ class FlakyTool(BaseTool):
 
     @property
     def description(self) -> str:
-        return "A test tool with temporary failures."
+        return (
+            "A test tool with temporary failures."
+        )
 
     @property
     def parameters(self) -> dict[str, Any]:
@@ -37,11 +45,17 @@ class FlakyTool(BaseTool):
             "additionalProperties": False,
         }
 
-    def execute(self, **kwargs: Any) -> dict[str, str]:
+    def execute(
+        self,
+        **kwargs: Any,
+    ) -> dict[str, str]:
 
         self.calls += 1
 
-        if self.calls <= self.failures_before_success:
+        if (
+            self.calls
+            <= self.failures_before_success
+        ):
             raise self.exception
 
         return {
@@ -65,7 +79,10 @@ def test_retry_succeeds_after_temporary_failure(
     executor = ToolExecutor(
         retry_policy=RetryPolicy(
             max_retries=2,
-        )
+        ),
+        guardrail=ToolGuardrail(
+            allowed_tools={"flaky_tool"},
+        ),
     )
 
     result = executor.execute(
@@ -98,7 +115,10 @@ def test_retry_can_handle_multiple_temporary_failures(
     executor = ToolExecutor(
         retry_policy=RetryPolicy(
             max_retries=2,
-        )
+        ),
+        guardrail=ToolGuardrail(
+            allowed_tools={"flaky_tool"},
+        ),
     )
 
     result = executor.execute(
@@ -130,7 +150,10 @@ def test_retry_stops_after_max_retries(
     executor = ToolExecutor(
         retry_policy=RetryPolicy(
             max_retries=2,
-        )
+        ),
+        guardrail=ToolGuardrail(
+            allowed_tools={"flaky_tool"},
+        ),
     )
 
     result = executor.execute(
@@ -143,7 +166,9 @@ def test_retry_stops_after_max_retries(
 
     assert result.error is not None
     assert result.error.type == "ToolExecutionError"
-    assert result.error.message == "temporary timeout"
+    assert result.error.message == (
+        "temporary timeout"
+    )
 
     assert tool.calls == 3
 
@@ -167,7 +192,10 @@ def test_non_retryable_error_is_not_retried(
     executor = ToolExecutor(
         retry_policy=RetryPolicy(
             max_retries=2,
-        )
+        ),
+        guardrail=ToolGuardrail(
+            allowed_tools={"flaky_tool"},
+        ),
     )
 
     result = executor.execute(
@@ -180,7 +208,9 @@ def test_non_retryable_error_is_not_retried(
 
     assert result.error is not None
     assert result.error.type == "ToolExecutionError"
-    assert result.error.message == "invalid operation"
+    assert result.error.message == (
+        "invalid operation"
+    )
 
     assert tool.calls == 1
 

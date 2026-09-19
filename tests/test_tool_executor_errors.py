@@ -7,8 +7,10 @@ def test_unknown_tool_error():
 
     executor = ToolExecutor()
 
-    with pytest.raises(KeyError):
-
+    with pytest.raises(
+        ValueError,
+        match="Tool is not allowed",
+    ):
         executor.execute(
             tool_name="unknown_tool",
             arguments={},
