@@ -3,6 +3,7 @@ from typing import Any, Callable
 
 from agents.agent_graph import build_agent_graph
 from agents.context import AgentContext
+from agents.guardrail import AgentGuardrail
 from agents.memory_manager import MemoryManager
 from exceptions import LLMError
 from rag.service import RAGService
@@ -17,12 +18,16 @@ class Agent:
         memory_manager: MemoryManager | None = None,
         rag_service: RAGService | None = None,
         checkpointer=None,
+        guardrail: AgentGuardrail | None = None,
     ):
         self.llm_client = llm_client
         self.tool_executor = tool_executor
         self.memory_manager = memory_manager
         self.rag_service = rag_service
         self.checkpointer = checkpointer
+        self.guardrail = (
+            guardrail or AgentGuardrail()
+        )
 
     def _get_tool_calls(
         self,
@@ -61,16 +66,8 @@ class Agent:
         tool_outputs = []
 
         for tool_call in tool_calls:
-
-            print(
-                "TOOL CALL:",
-                tool_call["name"],
-            )
-
-            print(
-                "ARGUMENTS:",
-                tool_call["arguments"],
-            )
+            print("TOOL CALL:", tool_call["name"])
+            print("ARGUMENTS:", tool_call["arguments"])
 
             if role == "user":
                 result = self.tool_executor(
@@ -82,16 +79,11 @@ class Agent:
             else:
                 result = self.tool_executor(
                     tool_name=tool_call["name"],
-                    arguments=tool_call[
-                        "arguments"
-                    ],
+                    arguments=tool_call["arguments"],
                     role=role,
                 )
 
-            print(
-                "TOOL RESULT:",
-                result,
-            )
+            print("TOOL RESULT:", result)
 
             if isinstance(result, ToolResult):
                 output = result.model_dump()
@@ -101,9 +93,7 @@ class Agent:
             tool_outputs.append(
                 {
                     "type": "function_call_output",
-                    "call_id": tool_call[
-                        "call_id"
-                    ],
+                    "call_id": tool_call["call_id"],
                     "output": json.dumps(
                         output,
                         ensure_ascii=False,
@@ -111,27 +101,17 @@ class Agent:
                 }
             )
 
-        context.set_tool_outputs(
-            tool_outputs
-        )
-
+        context.set_tool_outputs(tool_outputs)
         return context.build_next_model_context()
 
-    def _is_terminal_response(
-        self,
-        response,
-    ) -> bool:
-
-        return not self._get_tool_calls(
-            response
-        )
+    def _is_terminal_response(self, response) -> bool:
+        return not self._get_tool_calls(response)
 
     def _build_initial_message(
         self,
         message: str,
         memory_key: str | None,
     ) -> list[dict]:
-
         user_message = {
             "role": "user",
             "content": message,
@@ -141,14 +121,10 @@ class Agent:
             self.memory_manager is None
             or memory_key is None
         ):
-            return [
-                user_message
-            ]
+            return [user_message]
 
-        memory_context = (
-            self.memory_manager.build_context(
-                memory_key
-            )
+        memory_context = self.memory_manager.build_context(
+            memory_key
         )
 
         return [
@@ -162,7 +138,6 @@ class Agent:
         message: str,
         use_rag: bool,
     ) -> str | None:
-
         rag_prompt = None
 
         if use_rag:
@@ -172,17 +147,12 @@ class Agent:
                     "use_rag is True"
                 )
 
-            rag_prompt = (
-                self.rag_service.build_prompt(
-                    question=message,
-                )
+            rag_prompt = self.rag_service.build_prompt(
+                question=message,
             )
 
         if instructions and rag_prompt:
-            return (
-                f"{instructions}\n\n"
-                f"{rag_prompt}"
-            )
+            return f"{instructions}\n\n{rag_prompt}"
 
         return instructions or rag_prompt
 
@@ -197,6 +167,8 @@ class Agent:
         thread_id: str | None = None,
         role: str = "user",
     ) -> str:
+
+        self.guardrail.validate_input(message)
 
         if (
             self.checkpointer is not None
@@ -213,24 +185,18 @@ class Agent:
             instructions=instructions,
         )
 
-        initial_message = (
-            self._build_initial_message(
-                message=message,
-                memory_key=memory_key,
-            )
+        initial_message = self._build_initial_message(
+            message=message,
+            memory_key=memory_key,
         )
 
-        model_instructions = (
-            self._build_instructions(
-                instructions=instructions,
-                message=message,
-                use_rag=use_rag,
-            )
+        model_instructions = self._build_instructions(
+            instructions=instructions,
+            message=message,
+            use_rag=use_rag,
         )
 
-        context.instructions = (
-            model_instructions
-        )
+        context.instructions = model_instructions
 
         graph = build_agent_graph(
             agent=self,
@@ -268,13 +234,15 @@ class Agent:
             config=config,
         )
 
-        output_text = result[
-            "output_text"
-        ]
+        output_text = result["output_text"]
 
         if output_text is None:
             raise LLMError(
                 "Agent model response is missing"
             )
+
+        self.guardrail.validate_output(
+            output_text
+        )
 
         return output_text
