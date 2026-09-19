@@ -25,6 +25,7 @@ class RetrievalService:
         score_threshold: float | None = None,
         query: str | None = None,
     ) -> list[dict]:
+
         results = self.retriever.search(
             query_embedding=query_embedding,
             top_k=top_k,
