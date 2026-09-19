@@ -66,8 +66,14 @@ class Agent:
         tool_outputs = []
 
         for tool_call in tool_calls:
-            print("TOOL CALL:", tool_call["name"])
-            print("ARGUMENTS:", tool_call["arguments"])
+            print(
+                "TOOL CALL:",
+                tool_call["name"],
+            )
+            print(
+                "ARGUMENTS:",
+                tool_call["arguments"],
+            )
 
             if role == "user":
                 result = self.tool_executor(
@@ -79,11 +85,16 @@ class Agent:
             else:
                 result = self.tool_executor(
                     tool_name=tool_call["name"],
-                    arguments=tool_call["arguments"],
+                    arguments=tool_call[
+                        "arguments"
+                    ],
                     role=role,
                 )
 
-            print("TOOL RESULT:", result)
+            print(
+                "TOOL RESULT:",
+                result,
+            )
 
             if isinstance(result, ToolResult):
                 output = result.model_dump()
@@ -101,10 +112,16 @@ class Agent:
                 }
             )
 
-        context.set_tool_outputs(tool_outputs)
+        context.set_tool_outputs(
+            tool_outputs
+        )
+
         return context.build_next_model_context()
 
-    def _is_terminal_response(self, response) -> bool:
+    def _is_terminal_response(
+        self,
+        response,
+    ) -> bool:
         return not self._get_tool_calls(response)
 
     def _build_initial_message(
@@ -112,6 +129,7 @@ class Agent:
         message: str,
         memory_key: str | None,
     ) -> list[dict]:
+
         user_message = {
             "role": "user",
             "content": message,
@@ -123,8 +141,10 @@ class Agent:
         ):
             return [user_message]
 
-        memory_context = self.memory_manager.build_context(
-            memory_key
+        memory_context = (
+            self.memory_manager.build_context(
+                memory_key
+            )
         )
 
         return [
@@ -138,6 +158,7 @@ class Agent:
         message: str,
         use_rag: bool,
     ) -> str | None:
+
         rag_prompt = None
 
         if use_rag:
@@ -147,12 +168,17 @@ class Agent:
                     "use_rag is True"
                 )
 
-            rag_prompt = self.rag_service.build_prompt(
-                question=message,
+            rag_prompt = (
+                self.rag_service.build_prompt(
+                    question=message,
+                )
             )
 
         if instructions and rag_prompt:
-            return f"{instructions}\n\n{rag_prompt}"
+            return (
+                f"{instructions}\n\n"
+                f"{rag_prompt}"
+            )
 
         return instructions or rag_prompt
 
@@ -168,7 +194,9 @@ class Agent:
         role: str = "user",
     ) -> str:
 
-        self.guardrail.validate_input(message)
+        self.guardrail.validate_input(
+            message
+        )
 
         if (
             self.checkpointer is not None
@@ -185,18 +213,24 @@ class Agent:
             instructions=instructions,
         )
 
-        initial_message = self._build_initial_message(
-            message=message,
-            memory_key=memory_key,
+        initial_message = (
+            self._build_initial_message(
+                message=message,
+                memory_key=memory_key,
+            )
         )
 
-        model_instructions = self._build_instructions(
-            instructions=instructions,
-            message=message,
-            use_rag=use_rag,
+        model_instructions = (
+            self._build_instructions(
+                instructions=instructions,
+                message=message,
+                use_rag=use_rag,
+            )
         )
 
-        context.instructions = model_instructions
+        context.instructions = (
+            model_instructions
+        )
 
         graph = build_agent_graph(
             agent=self,
