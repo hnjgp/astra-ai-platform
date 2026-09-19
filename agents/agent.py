@@ -55,6 +55,7 @@ class Agent:
         self,
         tool_calls: list[dict],
         context: AgentContext,
+        role: str = "user",
     ) -> list[dict]:
 
         tool_outputs = []
@@ -71,12 +72,21 @@ class Agent:
                 tool_call["arguments"],
             )
 
-            result = self.tool_executor(
-                tool_name=tool_call["name"],
-                arguments=tool_call[
-                    "arguments"
-                ],
-            )
+            if role == "user":
+                result = self.tool_executor(
+                    tool_name=tool_call["name"],
+                    arguments=tool_call[
+                        "arguments"
+                    ],
+                )
+            else:
+                result = self.tool_executor(
+                    tool_name=tool_call["name"],
+                    arguments=tool_call[
+                        "arguments"
+                    ],
+                    role=role,
+                )
 
             print(
                 "TOOL RESULT:",
@@ -185,6 +195,7 @@ class Agent:
         memory_key: str | None = None,
         use_rag: bool = False,
         thread_id: str | None = None,
+        role: str = "user",
     ) -> str:
 
         if (
@@ -226,6 +237,7 @@ class Agent:
             context=context,
             initial_message=initial_message,
             max_tool_rounds=max_tool_rounds,
+            role=role,
             checkpointer=self.checkpointer,
         )
 
@@ -251,6 +263,7 @@ class Agent:
                 "tool_calls": [],
                 "output_text": None,
                 "error": None,
+                "role": role,
             },
             config=config,
         )

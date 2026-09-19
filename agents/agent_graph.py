@@ -13,6 +13,7 @@ class AgentGraphState(TypedDict):
     tool_calls: list[dict]
     output_text: str | None
     error: str | None
+    role: str
 
 
 def build_agent_graph(
@@ -20,6 +21,7 @@ def build_agent_graph(
     context: AgentContext,
     initial_message: list[dict],
     max_tool_rounds: int,
+    role: str = "user",
     checkpointer=None,
 ):
     from langgraph.graph import END, START, StateGraph
@@ -103,6 +105,7 @@ def build_agent_graph(
                         "tool_calls"
                     ],
                     context=context,
+                    role=graph_state["role"],
                 )
             )
 

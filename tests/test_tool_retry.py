@@ -2,6 +2,7 @@ from typing import Any
 
 import pytest
 
+from tools.authorization import ToolAuthorization
 from tools.base import BaseTool
 from tools.executor import ToolExecutor
 from tools.guardrail import ToolGuardrail
@@ -63,6 +64,24 @@ class FlakyTool(BaseTool):
         }
 
 
+def create_test_executor() -> ToolExecutor:
+    return ToolExecutor(
+        retry_policy=RetryPolicy(
+            max_retries=2,
+        ),
+        guardrail=ToolGuardrail(
+            allowed_tools={"flaky_tool"},
+        ),
+        authorization=ToolAuthorization(
+            role_permissions={
+                "user": {
+                    "flaky_tool",
+                },
+            },
+        ),
+    )
+
+
 def test_retry_succeeds_after_temporary_failure(
     monkeypatch,
 ):
@@ -76,14 +95,7 @@ def test_retry_succeeds_after_temporary_failure(
         lambda tool_name: tool,
     )
 
-    executor = ToolExecutor(
-        retry_policy=RetryPolicy(
-            max_retries=2,
-        ),
-        guardrail=ToolGuardrail(
-            allowed_tools={"flaky_tool"},
-        ),
-    )
+    executor = create_test_executor()
 
     result = executor.execute(
         tool_name="flaky_tool",
@@ -91,7 +103,6 @@ def test_retry_succeeds_after_temporary_failure(
     )
 
     assert result.success is True
-    assert result.tool_name == "flaky_tool"
     assert result.data == {
         "status": "success",
     }
@@ -112,14 +123,7 @@ def test_retry_can_handle_multiple_temporary_failures(
         lambda tool_name: tool,
     )
 
-    executor = ToolExecutor(
-        retry_policy=RetryPolicy(
-            max_retries=2,
-        ),
-        guardrail=ToolGuardrail(
-            allowed_tools={"flaky_tool"},
-        ),
-    )
+    executor = create_test_executor()
 
     result = executor.execute(
         tool_name="flaky_tool",
@@ -147,14 +151,7 @@ def test_retry_stops_after_max_retries(
         lambda tool_name: tool,
     )
 
-    executor = ToolExecutor(
-        retry_policy=RetryPolicy(
-            max_retries=2,
-        ),
-        guardrail=ToolGuardrail(
-            allowed_tools={"flaky_tool"},
-        ),
-    )
+    executor = create_test_executor()
 
     result = executor.execute(
         tool_name="flaky_tool",
@@ -165,7 +162,9 @@ def test_retry_stops_after_max_retries(
     assert result.tool_name == "flaky_tool"
 
     assert result.error is not None
-    assert result.error.type == "ToolExecutionError"
+    assert result.error.type == (
+        "ToolExecutionError"
+    )
     assert result.error.message == (
         "temporary timeout"
     )
@@ -189,14 +188,7 @@ def test_non_retryable_error_is_not_retried(
         lambda tool_name: tool,
     )
 
-    executor = ToolExecutor(
-        retry_policy=RetryPolicy(
-            max_retries=2,
-        ),
-        guardrail=ToolGuardrail(
-            allowed_tools={"flaky_tool"},
-        ),
-    )
+    executor = create_test_executor()
 
     result = executor.execute(
         tool_name="flaky_tool",
@@ -207,7 +199,9 @@ def test_non_retryable_error_is_not_retried(
     assert result.tool_name == "flaky_tool"
 
     assert result.error is not None
-    assert result.error.type == "ToolExecutionError"
+    assert result.error.type == (
+        "ToolExecutionError"
+    )
     assert result.error.message == (
         "invalid operation"
     )

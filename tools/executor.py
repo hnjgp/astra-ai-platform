@@ -4,6 +4,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from schemas import ToolError, ToolResult
+from tools.authorization import ToolAuthorization
 from tools.guardrail import ToolGuardrail
 from tools.registry import get_tool
 from tools.retry import RetryPolicy
@@ -18,6 +19,7 @@ class ToolExecutor:
         self,
         retry_policy: RetryPolicy | None = None,
         guardrail: ToolGuardrail | None = None,
+        authorization: ToolAuthorization | None = None,
     ):
         self.retry_policy = (
             retry_policy or RetryPolicy()
@@ -25,14 +27,23 @@ class ToolExecutor:
         self.guardrail = (
             guardrail or ToolGuardrail()
         )
+        self.authorization = (
+            authorization or ToolAuthorization()
+        )
 
     def execute(
         self,
         tool_name: str,
         arguments: dict[str, Any] | str | None = None,
+        role: str = "user",
     ) -> ToolResult:
 
         self.guardrail.check(tool_name)
+
+        self.authorization.check(
+            role=role,
+            tool_name=tool_name,
+        )
 
         tool = get_tool(tool_name)
 
@@ -83,6 +94,7 @@ class ToolExecutor:
 def execute_tool(
     tool_name: str,
     arguments: dict[str, Any] | str | None = None,
+    role: str = "user",
 ) -> ToolResult:
 
     executor = ToolExecutor()
@@ -90,4 +102,5 @@ def execute_tool(
     return executor.execute(
         tool_name=tool_name,
         arguments=arguments,
+        role=role,
     )
