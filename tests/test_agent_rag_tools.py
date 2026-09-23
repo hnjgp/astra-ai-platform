@@ -88,3 +88,12 @@ def test_agent_uses_rag_and_tools_in_the_same_run():
         "You are Astra.\n\n"
         "Use the knowledge base context."
     )
+
+    second_message = second_call.kwargs["message"]
+
+    assert any(
+        item.get("type") == "function_call_output"
+        and item.get("call_id") == "call-1"
+        and "healthy" in item.get("output", "")
+        for item in second_message
+    )
