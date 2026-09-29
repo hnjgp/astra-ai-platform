@@ -8,7 +8,7 @@ from agents.memory_manager import MemoryManager
 from agents.planner import Planner
 from exceptions import LLMError
 from rag.service import RAGService
-from schemas import ToolResult
+from schemas import Plan, ToolResult
 
 
 class Agent:
@@ -190,6 +190,7 @@ class Agent:
         message: str,
         instructions: str | None,
         planning: bool,
+        plan: Plan | None = None,
     ) -> str | None:
 
         if not planning:
@@ -200,9 +201,10 @@ class Agent:
                 "planner is required when planning is True"
             )
 
-        plan = self.planner.create_plan(
-            message
-        )
+        if plan is None:
+            plan = self.planner.create_plan(
+                message
+            )
 
         plan_text = plan.model_dump_json(
             indent=2,
@@ -247,6 +249,23 @@ class Agent:
                 "checkpointer is enabled"
             )
 
+        plan = None
+
+        if planning:
+            if self.planner is None:
+                raise ValueError(
+                    "planner is required when planning is True"
+                )
+
+            plan = self.planner.create_plan(
+                message
+            )
+
+            if not plan.steps:
+                raise ValueError(
+                    "planner returned an empty plan"
+                )
+
         context = AgentContext(
             original_message=message,
             tools=tools,
@@ -273,6 +292,7 @@ class Agent:
                 message=message,
                 instructions=model_instructions,
                 planning=planning,
+                plan=plan,
             )
         )
 
@@ -287,6 +307,8 @@ class Agent:
             max_tool_rounds=max_tool_rounds,
             role=role,
             checkpointer=self.checkpointer,
+            plan=plan,
+            planning=planning,
         )
 
         config = {
@@ -312,6 +334,10 @@ class Agent:
                 "output_text": None,
                 "error": None,
                 "role": role,
+                "plan": plan,
+                "planning": planning,
+                "current_step_index": 0,
+                "step_results": {},
             },
             config=config,
         )

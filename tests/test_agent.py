@@ -1,142 +1,209 @@
 from unittest.mock import Mock
 
+import pytest
+
 from agents.agent import Agent
-from agents.planner import Planner
-
-
-class FakeLLM:
-
-    def __init__(self):
-        self.generate_with_tools_calls = []
-
-    def generate_with_tools(
-        self,
-        message,
-        tools,
-        instructions=None,
-        previous_response_id=None,
-    ):
-
-        self.generate_with_tools_calls.append(
-            {
-                "message": message,
-                "tools": tools,
-                "instructions": instructions,
-                "previous_response_id": (
-                    previous_response_id
-                ),
-            }
-        )
-
-        class Response:
-
-            output = []
-
-            output_text = "پاسخ مستقیم Agent"
-
-            id = "response_1"
-
-        return Response()
+from exceptions import LLMError
+from schemas import Plan, PlanStep
 
 
 def test_agent_without_tools():
+    llm_client = Mock()
+    llm_client.generate_with_tools.return_value = Mock(
+        id="response_1",
+        output=[],
+        output_text="Hello from Astra",
+    )
+
+    tool_executor = Mock()
 
     agent = Agent(
-        llm_client=FakeLLM(),
-        tool_executor=lambda **kwargs: None,
+        llm_client=llm_client,
+        tool_executor=tool_executor,
     )
 
     result = agent.run(
-        message="سلام",
+        message="Hello",
         tools=[],
     )
 
-    assert result == "پاسخ مستقیم Agent"
+    assert result == "Hello from Astra"
+
+    llm_client.generate_with_tools.assert_called_once()
+
+    tool_executor.assert_not_called()
 
 
 def test_agent_uses_planner_when_planning_enabled():
+    llm_client = Mock()
+    llm_client.generate.return_value = "unused"
 
-    llm_client = FakeLLM()
-
-    planner = Mock(
-        spec=Planner
+    llm_client.generate_with_tools.return_value = Mock(
+        id="response_1",
+        output=[],
+        output_text="Planned response",
     )
 
-    class FakePlan:
+    tool_executor = Mock()
 
-        def model_dump_json(
-            self,
-            indent=None,
-            ensure_ascii=False,
-        ):
-            return (
-                '{'
-                '"steps": ['
-                '{'
-                '"step": 1, '
-                '"description": '
-                '"Check system status"'
-                '}'
-                ']'
-                '}'
+    planner = Mock()
+
+    planner.create_plan.return_value = Plan(
+        steps=[
+            PlanStep(
+                step=1,
+                description="Check system status",
             )
-
-    planner.create_plan.return_value = (
-        FakePlan()
+        ]
     )
 
     agent = Agent(
         llm_client=llm_client,
-        tool_executor=lambda **kwargs: None,
+        tool_executor=tool_executor,
         planner=planner,
     )
 
     result = agent.run(
-        message="وضعیت سیستم را بررسی کن",
+        message="Check the system status",
         tools=[],
         planning=True,
     )
 
-    assert result == "پاسخ مستقیم Agent"
+    assert result == "Planned response"
 
     planner.create_plan.assert_called_once_with(
-        "وضعیت سیستم را بررسی کن"
+        "Check the system status"
     )
 
-    assert (
-        "Execution plan:"
-        in llm_client.generate_with_tools_calls[
-            0
-        ]["instructions"]
+    llm_client.generate_with_tools.assert_called_once()
+
+    instructions = (
+        llm_client.generate_with_tools.call_args.kwargs[
+            "instructions"
+        ]
     )
 
-    assert (
-        "Check system status"
-        in llm_client.generate_with_tools_calls[
-            0
-        ]["instructions"]
-    )
+    assert "Execution plan:" in instructions
+    assert "Check system status" in instructions
 
 
 def test_agent_requires_planner_when_planning_enabled():
+    llm_client = Mock()
+    tool_executor = Mock()
 
     agent = Agent(
-        llm_client=FakeLLM(),
-        tool_executor=lambda **kwargs: None,
+        llm_client=llm_client,
+        tool_executor=tool_executor,
     )
 
-    try:
+    with pytest.raises(
+        ValueError,
+        match="planner is required when planning is True",
+    ):
         agent.run(
-            message="وضعیت سیستم را بررسی کن",
+            message="Check the system status",
             tools=[],
             planning=True,
         )
-    except ValueError as exc:
-        assert (
-            str(exc)
-            == "planner is required when planning is True"
+
+
+def test_agent_planning_rejects_empty_plan():
+    llm_client = Mock()
+    tool_executor = Mock()
+
+    planner = Mock()
+
+    planner.create_plan.return_value = Plan(
+        steps=[]
+    )
+
+    agent = Agent(
+        llm_client=llm_client,
+        tool_executor=tool_executor,
+        planner=planner,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="planner returned an empty plan",
+    ):
+        agent.run(
+            message="Check the system status",
+            tools=[],
+            planning=True,
         )
-    else:
-        raise AssertionError(
-            "Expected ValueError"
+
+
+def test_agent_preserves_existing_instructions_with_plan():
+    llm_client = Mock()
+
+    llm_client.generate_with_tools.return_value = Mock(
+        id="response_1",
+        output=[],
+        output_text="Final answer",
+    )
+
+    tool_executor = Mock()
+
+    planner = Mock()
+
+    planner.create_plan.return_value = Plan(
+        steps=[
+            PlanStep(
+                step=1,
+                description="Check system status",
+            )
+        ]
+    )
+
+    agent = Agent(
+        llm_client=llm_client,
+        tool_executor=tool_executor,
+        planner=planner,
+    )
+
+    result = agent.run(
+        message="Check the system status",
+        tools=[],
+        instructions="Answer clearly.",
+        planning=True,
+    )
+
+    assert result == "Final answer"
+
+    instructions = (
+        llm_client.generate_with_tools.call_args.kwargs[
+            "instructions"
+        ]
+    )
+
+    assert "Answer clearly." in instructions
+    assert "Execution plan:" in instructions
+    assert "Check system status" in instructions
+
+
+def test_agent_planning_requires_non_empty_plan():
+    llm_client = Mock()
+    tool_executor = Mock()
+
+    planner = Mock()
+
+    planner.create_plan.return_value = Plan(
+        steps=[]
+    )
+
+    agent = Agent(
+        llm_client=llm_client,
+        tool_executor=tool_executor,
+        planner=planner,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="planner returned an empty plan",
+    ):
+        agent.run(
+            message="Do something",
+            tools=[],
+            planning=True,
         )
