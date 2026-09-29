@@ -5,6 +5,7 @@ from agents.agent_graph import build_agent_graph
 from agents.context import AgentContext
 from agents.guardrail import AgentGuardrail
 from agents.memory_manager import MemoryManager
+from agents.planner import Planner
 from exceptions import LLMError
 from rag.service import RAGService
 from schemas import ToolResult
@@ -19,6 +20,7 @@ class Agent:
         rag_service: RAGService | None = None,
         checkpointer=None,
         guardrail: AgentGuardrail | None = None,
+        planner: Planner | None = None,
     ):
         self.llm_client = llm_client
         self.tool_executor = tool_executor
@@ -28,6 +30,7 @@ class Agent:
         self.guardrail = (
             guardrail or AgentGuardrail()
         )
+        self.planner = planner
 
     def _get_tool_calls(
         self,
@@ -182,6 +185,42 @@ class Agent:
 
         return instructions or rag_prompt
 
+    def _build_plan_instructions(
+        self,
+        message: str,
+        instructions: str | None,
+        planning: bool,
+    ) -> str | None:
+
+        if not planning:
+            return instructions
+
+        if self.planner is None:
+            raise ValueError(
+                "planner is required when planning is True"
+            )
+
+        plan = self.planner.create_plan(
+            message
+        )
+
+        plan_text = plan.model_dump_json(
+            indent=2,
+            ensure_ascii=False,
+        )
+
+        if instructions:
+            return (
+                f"{instructions}\n\n"
+                f"Execution plan:\n"
+                f"{plan_text}"
+            )
+
+        return (
+            f"Execution plan:\n"
+            f"{plan_text}"
+        )
+
     def run(
         self,
         message: str,
@@ -192,6 +231,7 @@ class Agent:
         use_rag: bool = False,
         thread_id: str | None = None,
         role: str = "user",
+        planning: bool = False,
     ) -> str:
 
         self.guardrail.validate_input(
@@ -225,6 +265,14 @@ class Agent:
                 instructions=instructions,
                 message=message,
                 use_rag=use_rag,
+            )
+        )
+
+        model_instructions = (
+            self._build_plan_instructions(
+                message=message,
+                instructions=model_instructions,
+                planning=planning,
             )
         )
 

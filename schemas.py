@@ -208,6 +208,19 @@ class AIRoute(APIModel):
 
 
 # ============================================================
+# Agent Planning Schemas
+# ============================================================
+
+class PlanStep(APIModel):
+    step: int
+    description: str
+
+
+class Plan(APIModel):
+    steps: list[PlanStep]
+
+
+# ============================================================
 # Tool Schemas
 # ============================================================
 
