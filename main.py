@@ -1,3 +1,6 @@
+import logging
+from contextlib import asynccontextmanager
+
 from fastapi import (
     FastAPI,
     Request,
@@ -11,9 +14,9 @@ from rag.exceptions import RAGError
 from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from database import DATABASE_URL, engine
+from database import init_app_database
+from rag.database import init_rag_database
 
-from models import Base
 
 from exceptions import (
     DocumentNotFoundError,
@@ -38,9 +41,25 @@ from router.ai import router as ai_router
 
 
 
+logger = logging.getLogger("astra.app")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    try:
+        init_rag_database()
+    except Exception:
+        # The API can still serve non-RAG endpoints; /ready reports
+        # the knowledge base as unavailable until the database is up.
+        logger.exception("RAG database initialisation failed")
+
+    yield
+
+
 app = FastAPI(
-    title="AI Backend API",
-    version="1.0.0"
+    title="Astra AI Platform",
+    version="1.0.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -63,32 +82,7 @@ app.add_middleware(RequestContextMiddleware)
 setup_logging(settings.LOG_LEVEL)
 
 
-Base.metadata.create_all(
-    bind=engine
-)
-
-
-def migrate_sqlite_schema() -> None:
-    """Add columns introduced after the first local SQLite release.
-
-    Production deployments should use versioned migrations; this keeps an
-    existing developer database usable while the project remains SQLite based.
-    """
-    if not DATABASE_URL.startswith("sqlite"):
-        return
-    with engine.begin() as connection:
-        columns = {row[1] for row in connection.exec_driver_sql("PRAGMA table_info(documents)")}
-        additions = {
-            "body": "VARCHAR",
-            "is_private": "BOOLEAN NOT NULL DEFAULT 0",
-            "owner_id": "INTEGER",
-        }
-        for name, definition in additions.items():
-            if name not in columns:
-                connection.exec_driver_sql(f"ALTER TABLE documents ADD COLUMN {name} {definition}")
-
-
-migrate_sqlite_schema()
+init_app_database()
 
 
 # Routers

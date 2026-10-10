@@ -14,7 +14,7 @@ class Document(Base):
     category: Mapped[str] = mapped_column(String)
     body: Mapped[str | None] = mapped_column(String, nullable=True)
     is_private: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    owner_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    owner_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
 
 
 
