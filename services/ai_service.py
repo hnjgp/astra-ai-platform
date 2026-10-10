@@ -13,7 +13,6 @@ from prompts.router import route_message
 from exceptions import LLMError
 
 from tools.executor import ToolExecutor
-from tools.registry import get_tool_definitions
 
 
 class AIService:
@@ -94,7 +93,7 @@ class AIService:
             tool_definitions = (
                 tools
                 if tools is not None
-                else get_tool_definitions()
+                else self.tool_executor.tool_definitions()
             )
 
             if not tool_definitions:

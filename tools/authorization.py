@@ -42,3 +42,15 @@ class ToolAuthorization:
                 f"Tool is not allowed for role: "
                 f"{role}"
             )
+
+    def allowed_tools(
+        self,
+        role: str,
+    ) -> set[str]:
+        """
+        Return the tools a role may use. Unknown roles get no tools.
+        """
+
+        return set(
+            self.role_permissions.get(role, set())
+        )
