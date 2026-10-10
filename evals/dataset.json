@@ -1,0 +1,68 @@
+{
+  "documents": [
+    {
+      "key": "vacation",
+      "text": "Vacation policy. Every employee receives 30 vacation days per year. Unused vacation days expire at the end of March of the following year."
+    },
+    {
+      "key": "passwords",
+      "text": "Security policy. Production passwords must be rotated every 90 days. Multi-factor authentication is mandatory for all administrator accounts."
+    },
+    {
+      "key": "deployment",
+      "text": "Deployment guide. Astra is deployed with Docker Compose. The API container waits for a healthy PostgreSQL database before it starts serving traffic."
+    },
+    {
+      "key": "expenses",
+      "text": "Expense policy. Travel expenses above 500 euros need approval from a manager before the trip is booked."
+    },
+    {
+      "key": "oncall",
+      "text": "On-call handbook. The on-call engineer must acknowledge every production alert within 15 minutes and write an incident note."
+    }
+  ],
+  "cases": [
+    {
+      "question": "How many vacation days does every employee receive per year?",
+      "expected_document": "vacation",
+      "expected_keywords": ["30"],
+      "expected_route": "rag"
+    },
+    {
+      "question": "How often must production passwords be rotated?",
+      "expected_document": "passwords",
+      "expected_keywords": ["90"],
+      "expected_route": "rag"
+    },
+    {
+      "question": "What does the API container wait for before it starts?",
+      "expected_document": "deployment",
+      "expected_keywords": ["PostgreSQL"],
+      "expected_route": "rag"
+    },
+    {
+      "question": "Who must approve travel expenses above 500 euros?",
+      "expected_document": "expenses",
+      "expected_keywords": ["manager"],
+      "expected_route": "rag"
+    },
+    {
+      "question": "Within how many minutes must the on-call engineer acknowledge a production alert?",
+      "expected_document": "oncall",
+      "expected_keywords": ["15"],
+      "expected_route": "rag"
+    },
+    {
+      "question": "Is the Astra service healthy right now?",
+      "expected_document": null,
+      "expected_keywords": ["healthy"],
+      "expected_route": "tool"
+    },
+    {
+      "question": "What is 12 multiplied by 3?",
+      "expected_document": null,
+      "expected_keywords": ["36"],
+      "expected_route": "normal"
+    }
+  ]
+}

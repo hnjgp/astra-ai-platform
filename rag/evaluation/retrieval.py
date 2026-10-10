@@ -66,3 +66,46 @@ def evaluate_recall_dataset(
     ]
 
     return average_recall(scores)
+
+def reciprocal_rank(
+    results: list[dict],
+    expected_chunks: set[tuple[int | None, int]],
+) -> float:
+    """
+    1 / position of the first relevant result (0 when none is found).
+    """
+
+    if not expected_chunks:
+        raise ValueError(
+            "expected_chunks must not be empty"
+        )
+
+    for position, result in enumerate(results, start=1):
+        if (
+            result["document_id"],
+            result["chunk_index"],
+        ) in expected_chunks:
+            return 1 / position
+
+    return 0.0
+
+
+def mean_reciprocal_rank(
+    evaluations: list[
+        tuple[
+            list[dict],
+            set[tuple[int | None, int]],
+        ]
+    ],
+) -> float:
+    if not evaluations:
+        raise ValueError(
+            "evaluations must not be empty"
+        )
+
+    return average_recall(
+        [
+            reciprocal_rank(results, expected_chunks)
+            for results, expected_chunks in evaluations
+        ]
+    )

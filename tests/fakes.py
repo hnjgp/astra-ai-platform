@@ -1,3 +1,6 @@
+from rag.embeddings.hashing import HashingEmbedder
+
+
 class FakeLLMClient:
 
     def __init__(self):
@@ -89,15 +92,10 @@ class ScriptedLLMClient:
         )
 
 
-class FakeEmbedder:
+class FakeEmbedder(HashingEmbedder):
     """
-    Deterministic bag-of-words embedder with 1536 dimensions.
-
-    Texts that share words get similar vectors, which is enough to
-    test retrieval without calling an embedding provider.
+    HashingEmbedder that counts single and batch calls.
     """
-
-    dimensions = 1536
 
     def __init__(self):
         self.calls = 0
@@ -105,28 +103,8 @@ class FakeEmbedder:
 
     def embed(self, text):
         self.calls += 1
-        return self._vector(text)
+        return super().embed(text)
 
     def embed_many(self, texts):
         self.batch_calls += 1
-        return [self._vector(text) for text in texts]
-
-    def _vector(self, text):
-        import hashlib
-        import math
-        import re
-
-        vector = [0.0] * self.dimensions
-
-        for word in re.findall(r"\w+", text.lower()):
-            digest = hashlib.sha256(word.encode()).digest()
-            index = int.from_bytes(digest[:4], "big") % self.dimensions
-            vector[index] += 1.0
-
-        norm = math.sqrt(sum(value * value for value in vector))
-
-        if norm == 0:
-            vector[0] = 1.0
-            return vector
-
-        return [value / norm for value in vector]
+        return [HashingEmbedder.embed(self, text) for text in texts]
