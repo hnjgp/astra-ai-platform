@@ -2,6 +2,7 @@ from sqlalchemy import delete
 
 from rag.chunking.chunker import DocumentChunker
 from rag.embeddings.embedder import Embedder
+from rag.exceptions import RAGError
 from rag.models import DocumentChunk
 
 
@@ -38,12 +39,37 @@ class DocumentIndexer:
 
         # Embed before opening the transaction so the database is not
         # held while waiting for the embedding provider.
-        embeddings = self.embedder.embed_many(chunks)
+        try:
+            embeddings = self.embedder.embed_many(chunks)
+        except Exception as exc:
+            raise RAGError(
+                "embedding provider is unavailable"
+            ) from exc
 
         if len(embeddings) != len(chunks):
             raise ValueError(
                 "embedder returned a wrong number of embeddings"
             )
+
+        try:
+            self._replace_chunks(
+                document_id,
+                chunks,
+                embeddings,
+            )
+        except Exception as exc:
+            raise RAGError(
+                "knowledge base storage failed"
+            ) from exc
+
+        return len(chunks)
+
+    def _replace_chunks(
+        self,
+        document_id: int,
+        chunks: list[str],
+        embeddings: list[list[float]],
+    ) -> None:
 
         with self.session_factory() as db:
             with db.begin():
@@ -67,8 +93,6 @@ class DocumentIndexer:
                     ]
                 )
 
-        return len(chunks)
-
     def remove(
         self,
         document_id: int,
@@ -77,12 +101,17 @@ class DocumentIndexer:
         Delete all chunks of a document. Returns the deleted chunk count.
         """
 
-        with self.session_factory() as db:
-            with db.begin():
-                result = db.execute(
-                    delete(DocumentChunk).where(
-                        DocumentChunk.document_id == document_id
+        try:
+            with self.session_factory() as db:
+                with db.begin():
+                    result = db.execute(
+                        delete(DocumentChunk).where(
+                            DocumentChunk.document_id == document_id
+                        )
                     )
-                )
+        except Exception as exc:
+            raise RAGError(
+                "knowledge base storage failed"
+            ) from exc
 
         return result.rowcount

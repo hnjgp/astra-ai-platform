@@ -218,3 +218,38 @@ def test_indexing_embeds_all_chunks_in_one_batch(rag_db_session):
     assert count > 3
     assert embedder.batch_calls == 1
     assert embedder.calls == 0
+
+
+class DownEmbedder:
+    def embed_many(self, texts):
+        raise ConnectionError("getaddrinfo failed")
+
+
+def test_embedding_outage_returns_503_and_keeps_old_chunks(
+    client,
+    indexer,
+    rag_db_session,
+):
+    headers = login(client, "index_owner6")
+
+    document_id = client.post(
+        "/documents/",
+        json={"title": "guide", "category": "AI", "body": TEXT},
+        headers=headers,
+    ).json()["id"]
+
+    client.post(f"/documents/{document_id}/index", headers=headers)
+    before = chunk_count(rag_db_session, document_id)
+
+    indexer.embedder = DownEmbedder()
+
+    response = client.post(
+        f"/documents/{document_id}/index",
+        headers=headers,
+    )
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "detail": "knowledge base is temporarily unavailable"
+    }
+    assert chunk_count(rag_db_session, document_id) == before
