@@ -1,3 +1,5 @@
+import pytest
+
 from llm.client import LLMClient
 
 from services.ai_service import AIService
@@ -5,6 +7,7 @@ from services.ai_service import AIService
 from tools.registry import get_tool_definitions
 
 
+@pytest.mark.live
 def test_full_tool_execution_cycle():
 
     llm_client = LLMClient()

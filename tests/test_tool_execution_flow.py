@@ -1,5 +1,6 @@
 import json
 
+import pytest
 from openai import OpenAI
 
 from config import OPENAI_API_KEY, OPENAI_MODEL
@@ -7,6 +8,7 @@ from config import OPENAI_API_KEY, OPENAI_MODEL
 from tools.executor import ToolExecutor
 
 
+@pytest.mark.live
 def test_tool_execution_flow():
 
     client = OpenAI(

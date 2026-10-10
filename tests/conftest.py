@@ -1,3 +1,5 @@
+import os
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -44,6 +46,32 @@ def enable_foreign_keys(dbapi_connection, _connection_record):
 import database
 
 database.SessionLocal = TestingSessionLocal
+
+
+def pytest_collection_modifyitems(config, items):
+    # Live tests call the real LLM provider; they are opt-in so the
+    # default suite stays deterministic and runs without network access.
+    if os.getenv("ASTRA_RUN_LIVE_TESTS") == "1":
+        return
+
+    skip_live = pytest.mark.skip(
+        reason="live test: set ASTRA_RUN_LIVE_TESTS=1 to run"
+    )
+
+    for item in items:
+        if "live" in item.keywords:
+            item.add_marker(skip_live)
+
+
+@pytest.fixture(autouse=True)
+def isolated_upload_directory(tmp_path, monkeypatch):
+    import services.document_upload_service as upload_service
+
+    monkeypatch.setattr(
+        upload_service,
+        "UPLOAD_DIRECTORY",
+        tmp_path / "uploads",
+    )
 
 
 @pytest.fixture(autouse=True)

@@ -18,6 +18,7 @@ PAYLOAD = {
 }
 
 
+@pytest.mark.live
 def test_stream_api():
 
     try:
