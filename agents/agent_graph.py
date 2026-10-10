@@ -177,6 +177,14 @@ def build_agent_graph(
         if graph_state["tool_calls"]:
 
             if (
+                len(graph_state["tool_calls"])
+                > agent.max_tool_calls_per_round
+            ):
+                raise LLMError(
+                    "Too many tool calls in one round"
+                )
+
+            if (
                 graph_state["round_number"]
                 >= graph_state["max_tool_rounds"]
             ):

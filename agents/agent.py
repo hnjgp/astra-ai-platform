@@ -87,6 +87,7 @@ class Agent:
         guardrail: AgentGuardrail | None = None,
         planner: Planner | None = None,
         approval_required_tools: Collection[str] | None = None,
+        max_tool_calls_per_round: int = 5,
     ):
         self.approval_required_tools = frozenset(
             approval_required_tools or ()
@@ -111,6 +112,8 @@ class Agent:
         self.planner = planner
         # None = derived from max_tool_rounds for each run.
         self.recursion_limit: int | None = None
+        # Limits how many tools one model response can trigger at once.
+        self.max_tool_calls_per_round = max_tool_calls_per_round
 
     def _get_tool_calls(
         self,
@@ -588,7 +591,7 @@ class Agent:
                 "Agent model response is missing"
             )
 
-        self.guardrail.validate_output(
+        output_text = self.guardrail.sanitize_output(
             output_text
         )
 
