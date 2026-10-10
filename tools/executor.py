@@ -3,6 +3,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from observability import metrics, timed
 from schemas import ToolError, ToolResult
 from tools.authorization import ToolAuthorization
 from tools.base import BaseTool
@@ -137,6 +138,31 @@ class ToolExecutor:
                 arguments
             )
 
+        with timed(
+            "tool_call",
+            tool=tool_name,
+        ):
+            result = self._run_with_retry(
+                tool=tool,
+                tool_name=tool_name,
+                arguments=arguments,
+            )
+
+        metrics.increment(
+            "tool_result",
+            tool=tool_name,
+            success=result.success,
+        )
+
+        return result
+
+    def _run_with_retry(
+        self,
+        tool: BaseTool,
+        tool_name: str,
+        arguments: dict[str, Any],
+    ) -> ToolResult:
+
         retries_used = 0
 
         while True:
@@ -162,6 +188,10 @@ class ToolExecutor:
                     retries_used=retries_used,
                 ):
                     retries_used += 1
+                    metrics.increment(
+                        "tool_retry",
+                        tool=tool_name,
+                    )
                     continue
 
                 return ToolResult(

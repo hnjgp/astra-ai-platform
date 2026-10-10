@@ -1,4 +1,5 @@
 import json
+import logging
 from collections.abc import Collection
 from dataclasses import dataclass, field
 from typing import Any, Callable
@@ -12,9 +13,13 @@ from agents.guardrail import AgentGuardrail
 from agents.memory_manager import MemoryManager
 from agents.planner import Planner
 from exceptions import LLMError
+from observability import log_event
 from rag.service import RAGService
 from schemas import Plan, ToolResult
 from tools.knowledge_base import KNOWLEDGE_BASE_TOOL_NAME
+
+
+logger = logging.getLogger("astra.agent")
 
 
 class ApprovalRequiredError(Exception):
@@ -152,15 +157,6 @@ class Agent:
         tool_outputs = []
 
         for tool_call in tool_calls:
-            print(
-                "TOOL CALL:",
-                tool_call["name"],
-            )
-            print(
-                "ARGUMENTS:",
-                tool_call["arguments"],
-            )
-
             if role == "user":
                 result = self.tool_executor(
                     tool_name=tool_call["name"],
@@ -177,9 +173,13 @@ class Agent:
                     role=role,
                 )
 
-            print(
-                "TOOL RESULT:",
-                result,
+            # Arguments and outputs are not logged: they can contain
+            # user data or document content.
+            log_event(
+                logger,
+                "tool executed",
+                tool=tool_call["name"],
+                success=getattr(result, "success", None),
             )
 
             if isinstance(result, ToolResult):

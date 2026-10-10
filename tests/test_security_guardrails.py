@@ -5,7 +5,7 @@ import pytest
 from agents.agent import Agent
 from agents.guardrail import AgentGuardrail
 from agents.input_security import InputSecurityChecker
-from agents.redaction import REDACTED, redact_secrets
+from redaction import REDACTED, redact_secrets
 from exceptions import LLMError
 from tests.fakes import ScriptedLLMClient
 

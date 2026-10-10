@@ -1,3 +1,5 @@
+import logging
+
 from schemas import AIMessage
 
 from agents.agent import Agent
@@ -13,6 +15,9 @@ from prompts.router import route_message
 from exceptions import LLMError
 
 from tools.executor import ToolExecutor
+
+
+logger = logging.getLogger("astra.ai_service")
 
 
 class AIService:
@@ -63,17 +68,15 @@ class AIService:
 
         except LLMError:
 
-            print(
-                "AIService error: LLMError"
-            )
+            logger.warning("generate failed: LLMError")
 
             raise
 
         except Exception as exc:
 
-            print(
-                f"AIService error: "
-                f"{type(exc).__name__}: {exc}"
+            logger.exception(
+                "AI service error: %s",
+                type(exc).__name__,
             )
 
             return (
@@ -111,17 +114,15 @@ class AIService:
 
         except LLMError:
 
-            print(
-                "AIService tool error: LLMError"
-            )
+            logger.warning("tool generation failed: LLMError")
 
             raise
 
         except Exception as exc:
 
-            print(
-                f"AIService tool error: "
-                f"{type(exc).__name__}: {exc}"
+            logger.exception(
+                "AI tool service error: %s",
+                type(exc).__name__,
             )
 
             return (
@@ -142,9 +143,9 @@ class AIService:
 
         except Exception as exc:
 
-            print(
-                f"AIService error: "
-                f"{type(exc).__name__}: {exc}"
+            logger.exception(
+                "AI service error: %s",
+                type(exc).__name__,
             )
 
             raise

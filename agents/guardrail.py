@@ -1,7 +1,7 @@
 from collections.abc import Iterable
 
 from agents.input_security import InputSecurityChecker
-from agents.redaction import configured_secrets, redact_secrets
+from redaction import configured_secrets, redact_secrets
 
 
 class AgentGuardrail:

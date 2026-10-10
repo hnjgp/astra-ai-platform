@@ -8,7 +8,7 @@ from fastapi import (
 from exceptions import LLMError
 from rag.exceptions import RAGError
 
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from database import DATABASE_URL, engine
@@ -23,6 +23,12 @@ from exceptions import (
 
 from dependency import get_api_key
 from rate_limit import RateLimitMiddleware
+from config import settings
+from observability import (
+    RequestContextMiddleware,
+    metrics,
+    setup_logging,
+)
 
 from router.document import router as document_router
 from router.user import router as user_router
@@ -49,6 +55,12 @@ app.include_router(ai_router)
 
 
 app.add_middleware(RateLimitMiddleware)
+
+# Added last so it is the outermost middleware and also measures
+# requests rejected by the rate limiter.
+app.add_middleware(RequestContextMiddleware)
+
+setup_logging(settings.LOG_LEVEL)
 
 
 Base.metadata.create_all(
@@ -162,6 +174,21 @@ def health():
         "status": "ok"
     }
 
+
+
+@app.get(
+    "/metrics",
+    response_class=PlainTextResponse,
+)
+def read_metrics(
+    api_key=Depends(get_api_key)
+):
+    """
+    Prometheus metrics: requests, latency, model/tool/RAG calls,
+    token usage and estimated cost. Protected by the internal API key.
+    """
+
+    return metrics.render_prometheus()
 
 
 @app.get("/auth-test")

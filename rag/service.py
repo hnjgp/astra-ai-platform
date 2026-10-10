@@ -1,5 +1,6 @@
 from collections.abc import Collection
 
+from observability import timed
 from rag.context import RAGContext, RAGContextBuilder
 from rag.embeddings.embedder import Embedder
 from rag.exceptions import RAGError
@@ -45,24 +46,25 @@ class RAGService:
         )
 
         try:
-            query_embedding = self.embedder.embed(
-                question
-            )
-
-            retrieval_results = (
-                self.retrieval_service.search(
-                    query_embedding=query_embedding,
-                    top_k=top_k,
-                    document_id=document_id,
-                    score_threshold=score_threshold,
-                    query=question,
-                    **access_filter,
+            with timed("rag_retrieval"):
+                query_embedding = self.embedder.embed(
+                    question
                 )
-            )
 
-            return self.context_builder.build(
-                retrieval_results
-            )
+                retrieval_results = (
+                    self.retrieval_service.search(
+                        query_embedding=query_embedding,
+                        top_k=top_k,
+                        document_id=document_id,
+                        score_threshold=score_threshold,
+                        query=question,
+                        **access_filter,
+                    )
+                )
+
+                return self.context_builder.build(
+                    retrieval_results
+                )
 
         except ValueError:
             raise

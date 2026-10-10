@@ -13,6 +13,13 @@ class Settings(BaseSettings):
     INTERNAL_API_KEY: str | None = None
     RATE_LIMIT_PER_MINUTE: int = 120
     AI_RATE_LIMIT_PER_MINUTE: int = 20
+    LOG_LEVEL: str = "INFO"
+
+    # Prices for the cost estimate in /metrics (USD per 1M tokens).
+    # Set them to your provider's current prices.
+    LLM_INPUT_COST_PER_1M_TOKENS: float = 0.0
+    LLM_OUTPUT_COST_PER_1M_TOKENS: float = 0.0
+    EMBEDDING_COST_PER_1M_TOKENS: float = 0.02
 
     @field_validator("SECRET_KEY")
     @classmethod
