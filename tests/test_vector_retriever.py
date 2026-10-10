@@ -244,3 +244,32 @@ def test_vector_retriever_rejects_invalid_score_threshold(
             raise AssertionError(
                 "ValueError was not raised"
             )
+
+def test_vector_retriever_only_returns_allowed_documents(rag_db_session):
+    rag_db_session.add_all(
+        [
+            DocumentChunk(
+                document_id=10,
+                chunk_index=0,
+                content="Public handbook.",
+                embedding=_vector(1.0, 0.0),
+            ),
+            DocumentChunk(
+                document_id=20,
+                chunk_index=0,
+                content="Someone else's private notes.",
+                embedding=_vector(1.0, 0.0),
+            ),
+        ]
+    )
+    rag_db_session.commit()
+
+    retriever = VectorRetriever(rag_db_session)
+
+    results = retriever.search(
+        query_embedding=_vector(1.0, 0.0),
+        top_k=5,
+        document_ids=[10],
+    )
+
+    assert [result["document_id"] for result in results] == [10]

@@ -38,7 +38,13 @@ class ToolExecutor:
             )
         )
         self.authorization = (
-            authorization or ToolAuthorization()
+            authorization
+            or ToolAuthorization(
+                role_permissions={
+                    role: self.registry
+                    for role in ("admin", "user", "guest")
+                }
+            )
         )
 
     def tool_definitions(

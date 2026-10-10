@@ -1,3 +1,5 @@
+from collections.abc import Collection
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -14,6 +16,7 @@ class VectorRetriever:
         top_k: int = 5,
         document_id: int | None = None,
         score_threshold: float | None = None,
+        document_ids: Collection[int] | None = None,
     ) -> list[dict]:
         if not query_embedding:
             raise ValueError("query_embedding must not be empty")
@@ -25,6 +28,11 @@ class VectorRetriever:
             raise ValueError(
                 "score_threshold must be between zero and one"
             )
+
+        # document_ids is an allow-list: an empty list means the caller
+        # may not read any document, so nothing is returned.
+        if document_ids is not None and not document_ids:
+            return []
 
         distance = DocumentChunk.embedding.cosine_distance(
             query_embedding
@@ -40,6 +48,13 @@ class VectorRetriever:
         if document_id is not None:
             statement = statement.where(
                 DocumentChunk.document_id == document_id
+            )
+
+        if document_ids is not None:
+            statement = statement.where(
+                DocumentChunk.document_id.in_(
+                    list(document_ids)
+                )
             )
 
         if score_threshold is not None:

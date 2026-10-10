@@ -1,3 +1,5 @@
+from collections.abc import Collection
+
 from sqlalchemy.orm import Session
 
 from rag.retrieval.reranker import KeywordReranker
@@ -24,13 +26,21 @@ class RetrievalService:
         document_id: int | None = None,
         score_threshold: float | None = None,
         query: str | None = None,
+        document_ids: Collection[int] | None = None,
     ) -> list[dict]:
+
+        access_filter = (
+            {}
+            if document_ids is None
+            else {"document_ids": document_ids}
+        )
 
         results = self.retriever.search(
             query_embedding=query_embedding,
             top_k=top_k,
             document_id=document_id,
             score_threshold=score_threshold,
+            **access_filter,
         )
 
         if self.reranker is None:
