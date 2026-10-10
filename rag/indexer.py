@@ -38,10 +38,12 @@ class DocumentIndexer:
 
         # Embed before opening the transaction so the database is not
         # held while waiting for the embedding provider.
-        embeddings = [
-            self.embedder.embed(chunk)
-            for chunk in chunks
-        ]
+        embeddings = self.embedder.embed_many(chunks)
+
+        if len(embeddings) != len(chunks):
+            raise ValueError(
+                "embedder returned a wrong number of embeddings"
+            )
 
         with self.session_factory() as db:
             with db.begin():

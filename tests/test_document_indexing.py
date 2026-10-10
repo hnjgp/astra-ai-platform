@@ -202,3 +202,19 @@ def test_changing_body_removes_stale_chunks(
     )
 
     assert chunk_count(rag_db_session, document_id) == 0
+
+
+def test_indexing_embeds_all_chunks_in_one_batch(rag_db_session):
+    embedder = FakeEmbedder()
+
+    indexer = DocumentIndexer(
+        embedder=embedder,
+        session_factory=RAGSessionLocal,
+        chunker=DocumentChunker(chunk_size=20, chunk_overlap=5),
+    )
+
+    count = indexer.index(document_id=505, text=TEXT)
+
+    assert count > 3
+    assert embedder.batch_calls == 1
+    assert embedder.calls == 0

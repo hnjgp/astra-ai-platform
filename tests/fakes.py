@@ -101,13 +101,20 @@ class FakeEmbedder:
 
     def __init__(self):
         self.calls = 0
+        self.batch_calls = 0
 
     def embed(self, text):
+        self.calls += 1
+        return self._vector(text)
+
+    def embed_many(self, texts):
+        self.batch_calls += 1
+        return [self._vector(text) for text in texts]
+
+    def _vector(self, text):
         import hashlib
         import math
         import re
-
-        self.calls += 1
 
         vector = [0.0] * self.dimensions
 
