@@ -1,6 +1,15 @@
 aivenv/
+.venv/
 __pycache__/
+*.pyc
 .pytest_cache/
 .git/
+.github/
+.vscode/
 .env
 *.db
+tests/
+scripts/
+documents/*
+!documents/sample.pdf
+astra_project_handoff_day50.md

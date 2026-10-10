@@ -8,7 +8,6 @@ cffi==2.1.1
 charset-normalizer==3.5.1
 click==8.4.2
 colorama==0.4.6
-coverage==7.15.4
 cryptography==50.0.0
 detect-installer==0.1.0
 distro==1.9.0
@@ -27,7 +26,6 @@ httptools==0.8.0
 httpx==0.28.1
 httpx2==2.12.0
 idna==3.18
-iniconfig==2.3.0
 Jinja2==3.1.6
 jiter==0.16.0
 markdown-it-py==4.2.0
@@ -35,7 +33,6 @@ MarkupSafe==3.0.3
 mdurl==0.1.2
 openai==3.2.0
 packaging==26.3
-pluggy==1.6.0
 pwdlib==0.3.1
 pyasn1==0.6.4
 pycparser==3.0
@@ -45,8 +42,6 @@ pydantic-settings==2.15.0
 pydantic_core==2.46.4
 Pygments==2.20.0
 pypdf==6.18.0
-pytest==9.1.1
-pytest-cov==7.1.0
 python-dotenv==1.2.2
 python-jose==3.5.0
 python-multipart==0.0.32
@@ -74,6 +69,4 @@ websockets==16.1.1
 psycopg[binary]==3.3.5
 pgvector==0.5.0
 langgraph==1.2.11
-langgraph==1.2.11
 langgraph-checkpoint-postgres==3.1.2
-websockets==16.1.1

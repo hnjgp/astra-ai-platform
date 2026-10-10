@@ -7,7 +7,7 @@ services:
     environment:
       POSTGRES_DB: astra
       POSTGRES_USER: astra
-      POSTGRES_PASSWORD: astra_password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-astra_password}
 
     ports:
       - "5433:5432"
@@ -15,5 +15,37 @@ services:
     volumes:
       - astra_postgres_data:/var/lib/postgresql/data
 
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U astra -d astra"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    container_name: astra-api
+    restart: unless-stopped
+
+    # Secrets (SECRET_KEY, OPENAI_API_KEY, INTERNAL_API_KEY) come from .env.
+    env_file:
+      - path: .env
+        required: false
+
+    environment:
+      # Inside the compose network the database is "postgres:5432".
+      DATABASE_URL: postgresql+psycopg://astra:${POSTGRES_PASSWORD:-astra_password}@postgres:5432/astra
+      RAG_DATABASE_URL: postgresql+psycopg://astra:${POSTGRES_PASSWORD:-astra_password}@postgres:5432/astra
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    ports:
+      - "8000:8000"
+
+    volumes:
+      - astra_uploads:/app/documents
+
 volumes:
   astra_postgres_data:
+  astra_uploads:
