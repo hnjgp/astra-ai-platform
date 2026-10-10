@@ -1,9 +1,13 @@
 import uuid
 
+import pytest
 from sqlalchemy import text
 
 from rag.database import RAGSessionLocal, rag_engine
 from rag.models import DocumentChunk
+
+
+pytestmark = pytest.mark.usefixtures("rag_database")
 
 
 def test_pgvector_extension_is_available():

@@ -1,0 +1,9 @@
+[run]
+source = .
+omit =
+    aivenv/*
+    tests/*
+    scripts/*
+
+[report]
+skip_empty = true
