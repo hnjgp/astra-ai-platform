@@ -10,7 +10,7 @@ from services.agent_service import (
 )
 from llm.client import LLMClient
 from rag.database import RAGSessionLocal
-from rag.embeddings.embedder import OpenAIEmbedder
+from services.providers import get_embedder
 from schemas import (
     AIGenerateRequest,
     AIGenerateResponse,
@@ -40,7 +40,7 @@ def get_agent_service() -> AgentService:
         _agent_service = AgentService(
             llm_client=llm_client,
             retriever_factory=build_knowledge_base_retriever(
-                embedder=OpenAIEmbedder(llm_client.client),
+                embedder=get_embedder(),
                 session_factory=RAGSessionLocal,
             ),
         )

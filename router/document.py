@@ -31,6 +31,8 @@ from services.document_upload_service import (
     process_uploaded_document,
     save_uploaded_document,
 )
+from services.providers import get_document_indexer
+from rag.indexer import DocumentIndexer
 
 
 router = APIRouter(
@@ -174,6 +176,7 @@ def update_document_api(
     request: DocumentUpdate,
     db=Depends(get_db),
     user=Depends(get_optional_current_user),
+    indexer: DocumentIndexer = Depends(get_document_indexer),
 ):
     document = get_document(
         db,
@@ -185,12 +188,19 @@ def update_document_api(
         user,
     )
 
+    changes = request.model_dump(
+        exclude_unset=True
+    )
+
+    if "body" in changes:
+        # The indexed chunks no longer match the text; the owner has to
+        # index the document again.
+        indexer.remove(document.id)
+
     return update_document(
         db,
         document,
-        **request.model_dump(
-            exclude_unset=True
-        ),
+        **changes,
     )
 
 
@@ -201,6 +211,7 @@ def delete_document_api(
     document_id: int,
     db=Depends(get_db),
     user=Depends(get_current_user),
+    indexer: DocumentIndexer = Depends(get_document_indexer),
 ):
     document = get_document(
         db,
@@ -212,6 +223,8 @@ def delete_document_api(
         user,
     )
 
+    indexer.remove(document.id)
+
     delete_document(
         db,
         document,
@@ -219,6 +232,52 @@ def delete_document_api(
 
     return {
         "message": "document deleted"
+    }
+
+
+@router.post(
+    "/{document_id}/index",
+)
+def index_document_api(
+    document_id: int,
+    db=Depends(get_db),
+    user=Depends(get_current_user),
+    indexer: DocumentIndexer = Depends(get_document_indexer),
+):
+    """
+    Add a document to the knowledge base (chunk, embed, store).
+
+    Indexing costs embedding calls, so only the owner or an admin can do it.
+    """
+
+    document = get_document(
+        db,
+        document_id,
+    )
+
+    if (
+        user.role != "admin"
+        and document.owner_id != user.id
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="document permission denied",
+        )
+
+    if not document.body or not document.body.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="document has no text to index",
+        )
+
+    chunks = indexer.index(
+        document_id=document.id,
+        text=document.body,
+    )
+
+    return {
+        "document_id": document.id,
+        "chunks": chunks,
     }
 
 

@@ -87,3 +87,39 @@ class ScriptedLLMClient:
             ],
             output_text="",
         )
+
+
+class FakeEmbedder:
+    """
+    Deterministic bag-of-words embedder with 1536 dimensions.
+
+    Texts that share words get similar vectors, which is enough to
+    test retrieval without calling an embedding provider.
+    """
+
+    dimensions = 1536
+
+    def __init__(self):
+        self.calls = 0
+
+    def embed(self, text):
+        import hashlib
+        import math
+        import re
+
+        self.calls += 1
+
+        vector = [0.0] * self.dimensions
+
+        for word in re.findall(r"\w+", text.lower()):
+            digest = hashlib.sha256(word.encode()).digest()
+            index = int.from_bytes(digest[:4], "big") % self.dimensions
+            vector[index] += 1.0
+
+        norm = math.sqrt(sum(value * value for value in vector))
+
+        if norm == 0:
+            vector[0] = 1.0
+            return vector
+
+        return [value / norm for value in vector]
