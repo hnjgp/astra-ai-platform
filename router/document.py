@@ -287,13 +287,20 @@ def index_document_api(
 )
 def secure_document(
     document_id: int,
-    permission=Depends(check_permission),
+    user=Depends(check_permission),
     db=Depends(get_db),
 ):
-    return get_document(
+    document = get_document(
         db,
         document_id,
     )
+
+    ensure_document_access(
+        document,
+        user,
+    )
+
+    return document
 
 
 def ensure_document_access(
