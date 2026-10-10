@@ -10,8 +10,6 @@ from rag.exceptions import RAGError
 
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.base import BaseHTTPMiddleware
-from time import monotonic
 
 from database import DATABASE_URL, engine
 
@@ -24,6 +22,7 @@ from exceptions import (
 )
 
 from dependency import get_api_key
+from rate_limit import RateLimitMiddleware
 
 from router.document import router as document_router
 from router.user import router as user_router
@@ -47,30 +46,6 @@ app.add_middleware(
 )
 
 app.include_router(ai_router)
-
-
-class RateLimitMiddleware(BaseHTTPMiddleware):
-    """A small in-process guard for login and write endpoints.
-
-    A shared store such as Redis should replace this in a multi-process
-    deployment; keeping it here makes the local API safe by default.
-    """
-    window_seconds = 60
-    max_requests = 120
-    requests: dict[str, list[float]] = {}
-
-    async def dispatch(self, request, call_next):
-        if request.method == "OPTIONS":
-            return await call_next(request)
-        now = monotonic()
-        client = request.client.host if request.client else "unknown"
-        key = f"{client}:{request.url.path}"
-        recent = [stamp for stamp in self.requests.get(key, []) if now - stamp < self.window_seconds]
-        if len(recent) >= self.max_requests:
-            return JSONResponse(status_code=429, content={"detail": "rate limit exceeded"})
-        recent.append(now)
-        self.requests[key] = recent
-        return await call_next(request)
 
 
 app.add_middleware(RateLimitMiddleware)

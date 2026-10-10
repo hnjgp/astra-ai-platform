@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str | None = None
     OPENAI_MODEL: str = "gpt-5.6-luna"
     INTERNAL_API_KEY: str | None = None
+    RATE_LIMIT_PER_MINUTE: int = 120
+    AI_RATE_LIMIT_PER_MINUTE: int = 20
 
     @field_validator("SECRET_KEY")
     @classmethod
