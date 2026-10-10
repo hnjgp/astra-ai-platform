@@ -89,44 +89,29 @@ def build_agent_graph(
         graph_state: AgentGraphState,
     ) -> dict[str, Any]:
 
+        # Only the first model call builds its message here. Later calls
+        # use current_message, which holds either the latest tool outputs
+        # (tools/recovery) or the next plan step (advance_step).
         if (
-            planning
-            and plan is not None
-            and graph_state[
-                "current_step_index"
-            ] < len(plan.steps)
-        ):
-            step_message = build_step_message(
-                step_index=graph_state[
-                    "current_step_index"
-                ],
-                step_results=graph_state[
-                    "step_results"
-                ],
-            )
-
-            if (
-                graph_state[
-                    "previous_response_id"
-                ]
-                is None
-            ):
-                message = [
-                    *graph_state[
-                        "initial_message"
-                    ],
-                    *step_message,
-                ]
-            else:
-                message = step_message
-
-        elif (
             graph_state["previous_response_id"]
             is None
         ):
             message = graph_state[
                 "initial_message"
             ]
+
+            if planning:
+                message = [
+                    *message,
+                    *build_step_message(
+                        step_index=graph_state[
+                            "current_step_index"
+                        ],
+                        step_results=graph_state[
+                            "step_results"
+                        ],
+                    ),
+                ]
 
         else:
             message = graph_state[

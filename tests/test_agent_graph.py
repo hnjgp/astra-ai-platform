@@ -541,3 +541,76 @@ def test_agent_graph_can_run_multiple_tools_in_one_plan_step():
         ]
         == "response_2"
     )
+
+def test_agent_graph_sends_tool_output_inside_a_plan_step():
+    llm_client = Mock()
+
+    llm_client.generate_with_tools.side_effect = [
+        make_tool_response(
+            response_id="response_1",
+            tool_name="get_system_status",
+        ),
+        make_terminal_response(
+            response_id="response_2",
+            output_text="The system is healthy.",
+        ),
+    ]
+
+    tool_executor = Mock(
+        return_value={
+            "service": "Astra",
+            "status": "healthy",
+        }
+    )
+
+    planner = Mock(spec=Planner)
+
+    planner.create_plan.return_value = Plan(
+        steps=[
+            PlanStep(
+                step=1,
+                description="Check the system status.",
+            )
+        ]
+    )
+
+    agent = Agent(
+        llm_client=llm_client,
+        tool_executor=tool_executor,
+        planner=planner,
+    )
+
+    result = agent.run(
+        message="Check the system.",
+        tools=[
+            {
+                "type": "function",
+                "name": "get_system_status",
+                "description": "Get system status",
+                "parameters": {},
+            }
+        ],
+        planning=True,
+    )
+
+    assert result == "The system is healthy."
+
+    second_message = (
+        llm_client
+        .generate_with_tools
+        .call_args_list[1]
+        .kwargs["message"]
+    )
+
+    # After a tool round the model must receive the tool output for the
+    # pending call, not the step instructions again.
+    assert second_message == [
+        {
+            "type": "function_call_output",
+            "call_id": "call_123",
+            "output": (
+                '{"service": "Astra", '
+                '"status": "healthy"}'
+            ),
+        }
+    ]
