@@ -40,8 +40,9 @@ def use_test_rag_database() -> None:
             url = test_url.render_as_string(hide_password=False)
 
             try:
+                # The maintenance database always exists on a server.
                 admin_engine = create_engine(
-                    base,
+                    base.set(database="postgres"),
                     isolation_level="AUTOCOMMIT",
                 )
 
