@@ -194,8 +194,9 @@ def auth_test(
     api_key=Depends(get_api_key)
 ):
 
+    # Never echo the key back to the caller.
     return {
-        "api_key": api_key
+        "authenticated": True
     }
 
 

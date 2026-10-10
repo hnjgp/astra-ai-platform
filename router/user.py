@@ -21,8 +21,9 @@ from time import monotonic
 
 from schemas import RoleUpdate, UserCreate
 
-from security import (
-    decode_access_token
+from dependency import (
+    get_current_user,
+    require_admin as admin_required,
 )
 
 from repository.user import (
@@ -38,40 +39,6 @@ router = APIRouter(
 _failed_logins: dict[str, list[float]] = {}
 LOGIN_WINDOW_SECONDS = 60
 MAX_FAILED_LOGINS = 5
-
-
-def get_current_user(
-    token: str = Depends(decode_access_token),
-    db=Depends(get_db)
-):
-
-    user = get_user_by_id(
-        db,
-        int(token["sub"])
-    )
-
-    if user is None:
-        raise HTTPException(
-            status_code=401,
-            detail="invalid token"
-        )
-
-    return user
-
-
-
-def admin_required(
-    user=Depends(get_current_user)
-):
-
-    if user.role != "admin":
-        raise HTTPException(
-            status_code=403,
-            detail="admin access required"
-        )
-
-    return user
-
 
 
 @router.post("/register")

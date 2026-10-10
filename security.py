@@ -1,15 +1,7 @@
 from datetime import datetime, timedelta, timezone
+from uuid import uuid4
 
-from fastapi import (
-    Depends,
-    HTTPException,
-    status
-)
-
-from fastapi.security import OAuth2PasswordBearer
-
-from jose import jwt, JWTError
-
+from jose import JWTError, jwt
 from pwdlib import PasswordHash
 
 from config import (
@@ -21,17 +13,17 @@ from config import (
 
 password_hash = PasswordHash.recommended()
 
+ACCESS_TOKEN_TYPE = "access"
 
-oauth2_scheme = OAuth2PasswordBearer(
-    tokenUrl="/users/login"
-)
+
+class InvalidTokenError(Exception):
+    pass
 
 
 def hash_password(
     password: str
 ):
     return password_hash.hash(password)
-
 
 
 def verify_password(
@@ -44,22 +36,28 @@ def verify_password(
     )
 
 
-
 def create_access_token(
-    data: dict
-):
+    data: dict,
+    expires_delta: timedelta | None = None,
+) -> str:
+
+    now = datetime.now(timezone.utc)
 
     to_encode = data.copy()
 
-    expire = (
-        datetime.now(timezone.utc)
-        +
-        timedelta(
-            minutes=ACCESS_TOKEN_EXPIRE_MINUTES
-        )
+    to_encode.update(
+        {
+            "iat": now,
+            "exp": now + (
+                expires_delta
+                or timedelta(
+                    minutes=ACCESS_TOKEN_EXPIRE_MINUTES
+                )
+            ),
+            "jti": uuid4().hex,
+            "type": ACCESS_TOKEN_TYPE,
+        }
     )
-
-    to_encode["exp"] = expire
 
     return jwt.encode(
         to_encode,
@@ -68,42 +66,39 @@ def create_access_token(
     )
 
 
-
 def decode_access_token(
-    token: str = Depends(oauth2_scheme)
-):
+    token: str,
+) -> dict:
+    """
+    Verify signature, expiry and required claims of an access token.
+    """
 
     try:
-
         payload = jwt.decode(
             token,
             SECRET_KEY,
-            algorithms=[
-                ALGORITHM
-            ]
+            algorithms=[ALGORITHM],
+            options={
+                "require_exp": True,
+                "require_sub": True,
+            },
         )
 
-        user_id = payload.get("sub")
+    except JWTError as exc:
+        raise InvalidTokenError(
+            "invalid token"
+        ) from exc
 
-        if user_id is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="invalid token",
-                headers={
-                    "WWW-Authenticate": "Bearer"
-                }
-            )
-
-
-        return payload
-
-
-    except JWTError:
-
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="invalid token",
-            headers={
-                "WWW-Authenticate": "Bearer"
-            }
+    if payload.get("type") != ACCESS_TOKEN_TYPE:
+        raise InvalidTokenError(
+            "invalid token type"
         )
+
+    try:
+        payload["user_id"] = int(payload["sub"])
+    except (TypeError, ValueError) as exc:
+        raise InvalidTokenError(
+            "invalid token subject"
+        ) from exc
+
+    return payload

@@ -1,82 +1,31 @@
-from datetime import datetime, timedelta, timezone
-from config import (
-    SECRET_KEY,
-    ALGORITHM,
-    ACCESS_TOKEN_EXPIRE_MINUTES,
-    INTERNAL_API_KEY
-)
+import hmac
+
 from fastapi import (
     Depends,
     Header,
     HTTPException
 )
-from config import (
-    SECRET_KEY,
-    ALGORITHM,
-    INTERNAL_API_KEY
-)
-
 from fastapi.security import (
     OAuth2PasswordBearer
 )
 
-from jose import JWTError, jwt
-
+from config import INTERNAL_API_KEY
 from database import get_db
-
 from models import User
-
-from config import (
-    SECRET_KEY,
-    ALGORITHM,
-    ACCESS_TOKEN_EXPIRE_MINUTES
-)
-
-
-def get_api_key(
-    api_key: str = Header()
-):
-    if api_key == INTERNAL_API_KEY:
-        return api_key
-
-    raise HTTPException(
-        status_code=401,
-        detail="invalid api key"
-    )
-
-
-def create_access_token(
-    data: dict
-):
-    to_encode = data.copy()
-
-    expire = (
-        datetime.now(timezone.utc)
-        + timedelta(
-            minutes=ACCESS_TOKEN_EXPIRE_MINUTES
-        )
-    )
-
-    to_encode["exp"] = expire
-
-    return jwt.encode(
-        to_encode,
-        SECRET_KEY,
-        algorithm=ALGORITHM
-    )
+from security import InvalidTokenError, decode_access_token
 
 
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl="/users/login"
 )
-optional_oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/users/login", auto_error=False)
+optional_oauth2_scheme = OAuth2PasswordBearer(
+    tokenUrl="/users/login",
+    auto_error=False,
+)
 
 
-def get_current_user(
-    token: str = Depends(oauth2_scheme),
-    db=Depends(get_db)
-):
-    credentials_exception = HTTPException(
+def credentials_exception() -> HTTPException:
+    return HTTPException(
         status_code=401,
         detail="Could not validate credentials",
         headers={
@@ -84,30 +33,51 @@ def get_current_user(
         }
     )
 
+
+def get_api_key(
+    api_key: str = Header()
+):
+    # No key configured means the internal API is disabled.
+    if not INTERNAL_API_KEY or not hmac.compare_digest(
+        api_key.encode(),
+        INTERNAL_API_KEY.encode(),
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail="invalid api key"
+        )
+
+    return api_key
+
+
+def _user_from_token(
+    token: str,
+    db,
+) -> User:
+
     try:
-        payload = jwt.decode(
-            token,
-            SECRET_KEY,
-            algorithms=[ALGORITHM]
-        )
+        payload = decode_access_token(token)
+    except InvalidTokenError:
+        raise credentials_exception()
 
-        user_id = payload.get("sub")
+    # The role is read from the database, not trusted from the token,
+    # so a role change or deleted user takes effect immediately.
+    user = db.get(
+        User,
+        payload["user_id"]
+    )
 
-        if user_id is None:
-            raise credentials_exception
+    if user is None:
+        raise credentials_exception()
 
-        user = db.get(
-            User,
-            int(user_id)
-        )
+    return user
 
-        if user is None:
-            raise credentials_exception
 
-        return user
-
-    except (JWTError, ValueError):
-        raise credentials_exception
+def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    db=Depends(get_db)
+):
+    return _user_from_token(token, db)
 
 
 def get_optional_current_user(
@@ -116,15 +86,8 @@ def get_optional_current_user(
 ):
     if token is None:
         return None
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = payload.get("sub")
-        user = db.get(User, int(user_id)) if user_id is not None else None
-    except (JWTError, ValueError):
-        raise HTTPException(status_code=401, detail="Could not validate credentials")
-    if user is None:
-        raise HTTPException(status_code=401, detail="Could not validate credentials")
-    return user
+
+    return _user_from_token(token, db)
 
 
 def require_admin(

@@ -236,7 +236,7 @@ def test_database_url_configuration():
 
     settings = Settings(
         _env_file=None,
-        SECRET_KEY="test",
+        SECRET_KEY="test-secret-key-with-at-least-32-chars",
         DATABASE_URL="sqlite:///configured.db",
         RAG_DATABASE_URL="postgresql+psycopg://test:test@localhost:5433/test",
     )

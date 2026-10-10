@@ -1,3 +1,4 @@
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -10,6 +11,17 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str | None = None
     OPENAI_MODEL: str = "gpt-5.6-luna"
     INTERNAL_API_KEY: str | None = None
+
+    @field_validator("SECRET_KEY")
+    @classmethod
+    def secret_key_is_strong(cls, value: str) -> str:
+        # HS256 keys shorter than 32 bytes are easy to brute force.
+        if len(value) < 32:
+            raise ValueError(
+                "SECRET_KEY must be at least 32 characters"
+            )
+
+        return value
 
     model_config = SettingsConfigDict(
         env_file=".env",
