@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -14,6 +16,10 @@ class Settings(BaseSettings):
     RATE_LIMIT_PER_MINUTE: int = 120
     AI_RATE_LIMIT_PER_MINUTE: int = 20
     LOG_LEVEL: str = "INFO"
+
+    # Where paused agent runs (human approval) are stored:
+    # "memory" (lost on restart) or "postgres" (the RAG database).
+    AGENT_CHECKPOINTER: Literal["memory", "postgres"] = "memory"
     # JSON list in the environment, e.g. ["https://app.example.com"]
     CORS_ORIGINS: list[str] = [
         "http://localhost",

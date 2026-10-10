@@ -6,13 +6,26 @@ from langgraph.checkpoint.postgres import (
 )
 
 
+def to_psycopg_url(database_url: str) -> str:
+    """
+    PostgresSaver uses psycopg directly, which does not understand the
+    SQLAlchemy driver suffix (postgresql+psycopg://).
+    """
+
+    return database_url.replace(
+        "postgresql+psycopg://",
+        "postgresql://",
+        1,
+    )
+
+
 @contextmanager
 def postgres_checkpointer(
     database_url: str,
 ) -> Iterator[PostgresSaver]:
 
     with PostgresSaver.from_conn_string(
-        database_url
+        to_psycopg_url(database_url)
     ) as checkpointer:
 
         checkpointer.setup()

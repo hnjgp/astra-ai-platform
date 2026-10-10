@@ -33,6 +33,18 @@ llm_client = LLMClient()
 ai_service = AIService(llm_client)
 
 _agent_service: AgentService | None = None
+_agent_checkpointer = None
+
+
+def configure_agent_checkpointer(checkpointer) -> None:
+    """
+    Called on startup to store paused runs in a persistent checkpointer.
+    """
+
+    global _agent_checkpointer, _agent_service
+
+    _agent_checkpointer = checkpointer
+    _agent_service = None
 
 
 def get_agent_service() -> AgentService:
@@ -46,6 +58,7 @@ def get_agent_service() -> AgentService:
                 session_factory=RAGSessionLocal,
             ),
             remove_document=get_document_indexer().remove,
+            checkpointer=_agent_checkpointer,
         )
 
     return _agent_service

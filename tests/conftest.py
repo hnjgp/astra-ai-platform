@@ -116,6 +116,7 @@ INTEGRATION_MODULES = {
     "test_readiness.py",
     "test_document_indexing.py",
     "test_e2e.py",
+    "test_postgres_checkpointer.py",
 }
 
 

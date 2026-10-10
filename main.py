@@ -1,5 +1,5 @@
 import logging
-from contextlib import asynccontextmanager
+from contextlib import ExitStack, asynccontextmanager
 
 from fastapi import (
     FastAPI,
@@ -36,6 +36,8 @@ from observability import (
 from router.document import router as document_router
 from router.user import router as user_router
 from router.ai import router as ai_router
+from router.ai import configure_agent_checkpointer
+from agents.checkpointer import postgres_checkpointer
 
 
 
@@ -53,7 +55,19 @@ async def lifespan(app: FastAPI):
         # the knowledge base as unavailable until the database is up.
         logger.exception("RAG database initialisation failed")
 
-    yield
+    with ExitStack() as stack:
+        if settings.AGENT_CHECKPOINTER == "postgres":
+            configure_agent_checkpointer(
+                stack.enter_context(
+                    postgres_checkpointer(
+                        settings.RAG_DATABASE_URL
+                    )
+                )
+            )
+
+        yield
+
+        configure_agent_checkpointer(None)
 
 
 app = FastAPI(
