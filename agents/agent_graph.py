@@ -268,6 +268,11 @@ def build_agent_graph(
             "current_message": (
                 context.build_next_model_context()
             ),
+            # A failed round still counts, otherwise a tool that keeps
+            # timing out would loop until the recursion limit.
+            "round_number": (
+                graph_state["round_number"] + 1
+            ),
             "recovery_count": (
                 graph_state["recovery_count"] + 1
             ),

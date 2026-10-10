@@ -2,6 +2,8 @@ import json
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
+from langgraph.errors import GraphRecursionError
+
 from agents.agent_graph import build_agent_graph
 from agents.context import AgentContext
 from agents.guardrail import AgentGuardrail
@@ -73,6 +75,8 @@ class Agent:
             guardrail or AgentGuardrail()
         )
         self.planner = planner
+        # None = derived from max_tool_rounds for each run.
+        self.recursion_limit: int | None = None
 
     def _get_tool_calls(
         self,
@@ -379,9 +383,12 @@ class Agent:
         )
 
         config = {
-            "recursion_limit": max(
-                25,
-                max_tool_rounds * 4 + 5,
+            "recursion_limit": (
+                self.recursion_limit
+                or max(
+                    25,
+                    max_tool_rounds * 4 + 5,
+                )
             ),
         }
 
@@ -390,26 +397,34 @@ class Agent:
                 "thread_id": thread_id,
             }
 
-        result = graph.invoke(
-            {
-                "initial_message": initial_message,
-                "current_message": initial_message,
-                "max_tool_rounds": max_tool_rounds,
-                "round_number": 0,
-                "previous_response_id": None,
-                "tool_calls": [],
-                "output_text": None,
-                "error": None,
-                "role": role,
-                "plan": plan,
-                "planning": planning,
-                "current_step_index": 0,
-                "step_results": {},
-                "tools_used": [],
-                "recovery_count": 0,
-            },
-            config=config,
-        )
+        initial_state = {
+            "initial_message": initial_message,
+            "current_message": initial_message,
+            "max_tool_rounds": max_tool_rounds,
+            "round_number": 0,
+            "previous_response_id": None,
+            "tool_calls": [],
+            "output_text": None,
+            "error": None,
+            "role": role,
+            "plan": plan,
+            "planning": planning,
+            "current_step_index": 0,
+            "step_results": {},
+            "tools_used": [],
+            "recovery_count": 0,
+        }
+
+        try:
+            result = graph.invoke(
+                initial_state,
+                config=config,
+            )
+
+        except GraphRecursionError as exc:
+            raise LLMError(
+                "Agent exceeded its step limit"
+            ) from exc
 
         output_text = result["output_text"]
 
