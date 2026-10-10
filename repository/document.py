@@ -1,3 +1,5 @@
+from sqlalchemy import or_
+
 from models import Document
 
 
@@ -60,3 +62,28 @@ def delete_document(db, document):
     db.commit()
 
     return document
+
+
+def get_readable_document_ids(db, user):
+    """
+    Return the ids of documents this user may read.
+
+    None means "no restriction" (admin). Public documents and the
+    user's own private documents are readable for everyone else.
+    """
+
+    if user.role == "admin":
+        return None
+
+    rows = (
+        db.query(Document.id)
+        .filter(
+            or_(
+                Document.is_private.is_(False),
+                Document.owner_id == user.id,
+            )
+        )
+        .all()
+    )
+
+    return [row.id for row in rows]

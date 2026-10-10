@@ -6,6 +6,7 @@ from fastapi import (
 
 
 from exceptions import LLMError
+from rag.exceptions import RAGError
 
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -196,6 +197,19 @@ def auth_test(
     return {
         "api_key": api_key
     }
+
+
+@app.exception_handler(RAGError)
+async def rag_error_handler(
+    request: Request,
+    exc: RAGError,
+):
+    return JSONResponse(
+        status_code=503,
+        content={
+            "detail": "knowledge base is temporarily unavailable"
+        },
+    )
 
 
 @app.exception_handler(LLMError)

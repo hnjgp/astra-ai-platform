@@ -186,6 +186,44 @@ class AIChatRequest(APIModel):
 
 
 # ============================================================
+# Agent Schemas
+# ============================================================
+
+class AgentRequest(APIModel):
+    message: str = Field(
+        min_length=1,
+        max_length=10_000,
+    )
+
+    conversation_id: str | None = Field(
+        default=None,
+        pattern=r"^[A-Za-z0-9_-]{1,64}$",
+    )
+
+    planning: bool = False
+
+
+class AgentSource(BaseModel):
+    document_id: int | None
+    chunk_index: int
+    score: float
+
+
+class AgentResponse(BaseModel):
+    answer: str
+    route: Literal[
+        "normal",
+        "tool",
+        "rag",
+        "tool+rag",
+    ]
+    tools_used: list[str]
+    recovered: bool
+    sources: list[AgentSource]
+    conversation_id: str | None = None
+
+
+# ============================================================
 # AI Routing Schema
 # ============================================================
 

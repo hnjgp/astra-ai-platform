@@ -70,6 +70,11 @@ class MemoryManager:
         if value is None:
             return []
 
+        if isinstance(value, list):
+            value = "\n\n".join(
+                str(item) for item in value
+            )
+
         return [
             {
                 "role": "system",

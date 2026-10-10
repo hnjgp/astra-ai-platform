@@ -19,6 +19,8 @@ class AgentGraphState(TypedDict):
     planning: bool
     current_step_index: int
     step_results: dict[int, str]
+    tools_used: list[str]
+    recovery_count: int
 
 
 def build_agent_graph(
@@ -200,6 +202,15 @@ def build_agent_graph(
                     graph_state["round_number"]
                     + 1
                 ),
+                "tools_used": [
+                    *graph_state["tools_used"],
+                    *(
+                        tool_call["name"]
+                        for tool_call in graph_state[
+                            "tool_calls"
+                        ]
+                    ),
+                ],
                 "error": None,
             }
 
@@ -256,6 +267,9 @@ def build_agent_graph(
         return {
             "current_message": (
                 context.build_next_model_context()
+            ),
+            "recovery_count": (
+                graph_state["recovery_count"] + 1
             ),
             "error": None,
         }

@@ -1,4 +1,5 @@
 import json
+from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from agents.agent_graph import build_agent_graph
@@ -9,6 +10,47 @@ from agents.planner import Planner
 from exceptions import LLMError
 from rag.service import RAGService
 from schemas import Plan, ToolResult
+from tools.knowledge_base import KNOWLEDGE_BASE_TOOL_NAME
+
+
+@dataclass
+class AgentRunResult:
+    output_text: str
+    tools_used: list[str] = field(default_factory=list)
+    used_rag_prompt: bool = False
+    recovery_count: int = 0
+    plan: Plan | None = None
+
+    @property
+    def route(self) -> str:
+        """
+        Which path the run actually took: normal, tool, rag or tool+rag.
+        """
+
+        used_rag = (
+            self.used_rag_prompt
+            or KNOWLEDGE_BASE_TOOL_NAME in self.tools_used
+        )
+
+        used_other_tools = any(
+            name != KNOWLEDGE_BASE_TOOL_NAME
+            for name in self.tools_used
+        )
+
+        if used_rag and used_other_tools:
+            return "tool+rag"
+
+        if used_rag:
+            return "rag"
+
+        if used_other_tools:
+            return "tool"
+
+        return "normal"
+
+    @property
+    def recovered(self) -> bool:
+        return self.recovery_count > 0
 
 
 class Agent:
@@ -236,6 +278,31 @@ class Agent:
         planning: bool = False,
     ) -> str:
 
+        return self.run_detailed(
+            message=message,
+            tools=tools,
+            max_tool_rounds=max_tool_rounds,
+            instructions=instructions,
+            memory_key=memory_key,
+            use_rag=use_rag,
+            thread_id=thread_id,
+            role=role,
+            planning=planning,
+        ).output_text
+
+    def run_detailed(
+        self,
+        message: str,
+        tools: list[dict],
+        max_tool_rounds: int = 5,
+        instructions: str | None = None,
+        memory_key: str | None = None,
+        use_rag: bool = False,
+        thread_id: str | None = None,
+        role: str = "user",
+        planning: bool = False,
+    ) -> AgentRunResult:
+
         self.guardrail.validate_input(
             message
         )
@@ -338,6 +405,8 @@ class Agent:
                 "planning": planning,
                 "current_step_index": 0,
                 "step_results": {},
+                "tools_used": [],
+                "recovery_count": 0,
             },
             config=config,
         )
@@ -353,4 +422,10 @@ class Agent:
             output_text
         )
 
-        return output_text
+        return AgentRunResult(
+            output_text=output_text,
+            tools_used=list(result["tools_used"]),
+            used_rag_prompt=use_rag,
+            recovery_count=result["recovery_count"],
+            plan=plan,
+        )
