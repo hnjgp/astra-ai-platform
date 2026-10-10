@@ -98,3 +98,65 @@ class KnowledgeBaseSearchTool(BaseTool):
                 for source in context.sources
             ],
         }
+
+
+REMOVE_DOCUMENT_TOOL_NAME = "remove_knowledge_document"
+
+
+class RemoveKnowledgeDocumentInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    document_id: int = Field(gt=0)
+
+
+class RemoveKnowledgeDocumentTool(BaseTool):
+    """
+    Removes a document from the knowledge base index.
+
+    Destructive, so the agent only runs it after a human approves.
+    """
+
+    def __init__(
+        self,
+        remove: Callable[[int], int],
+    ):
+        self.remove = remove
+
+    @property
+    def name(self) -> str:
+        return REMOVE_DOCUMENT_TOOL_NAME
+
+    @property
+    def description(self) -> str:
+        return (
+            "Remove a document from the knowledge base index so it is "
+            "no longer used in answers. Requires human approval."
+        )
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "document_id": {
+                    "type": "integer",
+                    "description": "Id of the document to remove.",
+                },
+            },
+            "required": ["document_id"],
+            "additionalProperties": False,
+        }
+
+    @property
+    def input_schema(self) -> type[BaseModel]:
+        return RemoveKnowledgeDocumentInput
+
+    def execute(self, **kwargs: Any) -> dict[str, Any]:
+        data = RemoveKnowledgeDocumentInput(**kwargs)
+
+        removed_chunks = self.remove(data.document_id)
+
+        return {
+            "document_id": data.document_id,
+            "removed_chunks": removed_chunks,
+        }

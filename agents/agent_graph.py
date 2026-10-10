@@ -1,3 +1,5 @@
+import json
+from collections.abc import Collection
 from typing import Any, TypedDict
 
 from agents.context import AgentContext
@@ -21,6 +23,12 @@ class AgentGraphState(TypedDict):
     step_results: dict[int, str]
     tools_used: list[str]
     recovery_count: int
+    # Stored so a paused run can be rebuilt and resumed.
+    original_message: str
+    tools: list[dict]
+    instructions: str | None
+    used_rag_prompt: bool
+    memory_key: str | None
 
 
 def build_agent_graph(
@@ -32,8 +40,10 @@ def build_agent_graph(
     checkpointer=None,
     plan: Plan | None = None,
     planning: bool = False,
+    approval_required_tools: Collection[str] = frozenset(),
 ):
     from langgraph.graph import END, START, StateGraph
+    from langgraph.types import interrupt
 
     def build_step_message(
         step_index: int,
@@ -181,9 +191,62 @@ def build_agent_graph(
 
         return "end"
 
+    def rejected_round(
+        graph_state: AgentGraphState,
+    ) -> dict[str, Any]:
+
+        context.set_tool_outputs(
+            [
+                {
+                    "type": "function_call_output",
+                    "call_id": tool_call["call_id"],
+                    "output": json.dumps(
+                        {
+                            "success": False,
+                            "error": (
+                                "Rejected by a human reviewer. "
+                                "The tool was not executed."
+                            ),
+                        }
+                    ),
+                }
+                for tool_call in graph_state["tool_calls"]
+            ]
+        )
+
+        return {
+            "current_message": (
+                context.build_next_model_context()
+            ),
+            "round_number": (
+                graph_state["round_number"] + 1
+            ),
+            "error": None,
+        }
+
     def tools_node(
         graph_state: AgentGraphState,
     ) -> dict[str, Any]:
+
+        pending_approval = [
+            tool_call
+            for tool_call in graph_state["tool_calls"]
+            if tool_call["name"] in approval_required_tools
+        ]
+
+        if pending_approval:
+            # Pauses the graph; the checkpointer keeps the state until a
+            # human answers. On resume this node runs again from the top
+            # and interrupt() returns the decision, so nothing before
+            # this point may have side effects.
+            decision = interrupt(
+                {
+                    "tool_calls": pending_approval,
+                }
+            )
+
+            if not decision.get("approved"):
+                return rejected_round(graph_state)
 
         try:
             next_message = (

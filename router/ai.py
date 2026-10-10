@@ -10,14 +10,16 @@ from services.agent_service import (
 )
 from llm.client import LLMClient
 from rag.database import RAGSessionLocal
-from services.providers import get_embedder
+from services.providers import get_document_indexer, get_embedder
 from schemas import (
     AIGenerateRequest,
     AIGenerateResponse,
     AIChatRequest,
+    AgentApprovalRequest,
     AgentRequest,
     AgentResponse,
     AgentSource,
+    PendingToolCall,
 )
 
 
@@ -43,6 +45,7 @@ def get_agent_service() -> AgentService:
                 embedder=get_embedder(),
                 session_factory=RAGSessionLocal,
             ),
+            remove_document=get_document_indexer().remove,
         )
 
     return _agent_service
@@ -85,6 +88,30 @@ def chat_stream(request: AIChatRequest):
     )
 
 
+def to_agent_response(
+    result,
+    conversation_id: str | None = None,
+) -> AgentResponse:
+
+    return AgentResponse(
+        status=result.status,
+        answer=result.answer,
+        route=result.route,
+        tools_used=result.tools_used,
+        recovered=result.recovered,
+        sources=[
+            AgentSource(**source.model_dump())
+            for source in result.sources
+        ],
+        conversation_id=conversation_id,
+        thread_id=result.thread_id,
+        pending_tool_calls=[
+            PendingToolCall(**tool_call)
+            for tool_call in result.pending_tool_calls
+        ],
+    )
+
+
 @router.post(
     "/agent",
     response_model=AgentResponse,
@@ -111,14 +138,45 @@ def run_agent(
             detail=str(exc),
         ) from exc
 
-    return AgentResponse(
-        answer=result.answer,
-        route=result.route,
-        tools_used=result.tools_used,
-        recovered=result.recovered,
-        sources=[
-            AgentSource(**source.model_dump())
-            for source in result.sources
-        ],
+    return to_agent_response(
+        result,
         conversation_id=request.conversation_id,
     )
+
+
+@router.post(
+    "/agent/approvals/{thread_id}",
+    response_model=AgentResponse,
+)
+def answer_agent_approval(
+    thread_id: str,
+    request: AgentApprovalRequest,
+    user=Depends(get_current_user),
+    db=Depends(get_db),
+    agent_service: AgentService = Depends(get_agent_service),
+):
+    """
+    Approve or reject the sensitive tool calls of a paused agent run.
+    """
+
+    try:
+        result = agent_service.resume(
+            thread_id=thread_id,
+            approved=request.approved,
+            user=user,
+            db=db,
+        )
+
+    except LookupError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc),
+        ) from exc
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        ) from exc
+
+    return to_agent_response(result)

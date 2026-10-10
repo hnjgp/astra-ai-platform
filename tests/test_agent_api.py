@@ -105,12 +105,15 @@ def test_agent_normal_route(client, agent_setup):
 
     assert response.status_code == 200
     assert response.json() == {
+        "status": "completed",
         "answer": "Hello from Astra",
         "route": "normal",
         "tools_used": [],
         "recovered": False,
         "sources": [],
         "conversation_id": None,
+        "thread_id": None,
+        "pending_tool_calls": [],
     }
 
 

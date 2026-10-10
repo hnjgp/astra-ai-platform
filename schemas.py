@@ -209,18 +209,34 @@ class AgentSource(BaseModel):
     score: float
 
 
+class PendingToolCall(BaseModel):
+    call_id: str
+    name: str
+    arguments: str
+
+
 class AgentResponse(BaseModel):
-    answer: str
+    status: Literal[
+        "completed",
+        "approval_required",
+    ]
+    answer: str | None = None
     route: Literal[
         "normal",
         "tool",
         "rag",
         "tool+rag",
-    ]
-    tools_used: list[str]
-    recovered: bool
-    sources: list[AgentSource]
+    ] | None = None
+    tools_used: list[str] = []
+    recovered: bool = False
+    sources: list[AgentSource] = []
     conversation_id: str | None = None
+    thread_id: str | None = None
+    pending_tool_calls: list[PendingToolCall] = []
+
+
+class AgentApprovalRequest(APIModel):
+    approved: bool
 
 
 # ============================================================

@@ -1,8 +1,10 @@
 import json
+from collections.abc import Collection
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from langgraph.errors import GraphRecursionError
+from langgraph.types import Command
 
 from agents.agent_graph import build_agent_graph
 from agents.context import AgentContext
@@ -15,6 +17,23 @@ from schemas import Plan, ToolResult
 from tools.knowledge_base import KNOWLEDGE_BASE_TOOL_NAME
 
 
+class ApprovalRequiredError(Exception):
+    """
+    The run is paused until a human approves or rejects the tool calls.
+    """
+
+    def __init__(
+        self,
+        thread_id: str,
+        tool_calls: list[dict],
+    ):
+        super().__init__(
+            "human approval is required"
+        )
+        self.thread_id = thread_id
+        self.tool_calls = tool_calls
+
+
 @dataclass
 class AgentRunResult:
     output_text: str
@@ -22,6 +41,8 @@ class AgentRunResult:
     used_rag_prompt: bool = False
     recovery_count: int = 0
     plan: Plan | None = None
+    original_message: str = ""
+    memory_key: str | None = None
 
     @property
     def route(self) -> str:
@@ -65,7 +86,20 @@ class Agent:
         checkpointer=None,
         guardrail: AgentGuardrail | None = None,
         planner: Planner | None = None,
+        approval_required_tools: Collection[str] | None = None,
     ):
+        self.approval_required_tools = frozenset(
+            approval_required_tools or ()
+        )
+
+        if (
+            self.approval_required_tools
+            and checkpointer is None
+        ):
+            raise ValueError(
+                "checkpointer is required for tool approval"
+            )
+
         self.llm_client = llm_client
         self.tool_executor = tool_executor
         self.memory_manager = memory_manager
@@ -380,22 +414,15 @@ class Agent:
             checkpointer=self.checkpointer,
             plan=plan,
             planning=planning,
+            approval_required_tools=(
+                self.approval_required_tools
+            ),
         )
 
-        config = {
-            "recursion_limit": (
-                self.recursion_limit
-                or max(
-                    25,
-                    max_tool_rounds * 4 + 5,
-                )
-            ),
-        }
-
-        if thread_id is not None:
-            config["configurable"] = {
-                "thread_id": thread_id,
-            }
+        config = self._graph_config(
+            max_tool_rounds=max_tool_rounds,
+            thread_id=thread_id,
+        )
 
         initial_state = {
             "initial_message": initial_message,
@@ -413,11 +440,129 @@ class Agent:
             "step_results": {},
             "tools_used": [],
             "recovery_count": 0,
+            "original_message": message,
+            "tools": tools,
+            "instructions": model_instructions,
+            "used_rag_prompt": use_rag,
+            "memory_key": memory_key,
         }
+
+        return self._invoke(
+            graph=graph,
+            graph_input=initial_state,
+            config=config,
+        )
+
+    def resume(
+        self,
+        thread_id: str,
+        approved: bool,
+        role: str,
+    ) -> AgentRunResult:
+        """
+        Continue a run that is waiting for human approval.
+        """
+
+        if self.checkpointer is None:
+            raise ValueError(
+                "checkpointer is required to resume a run"
+            )
+
+        # A graph is needed to read the saved state; the real graph is
+        # rebuilt from that state below.
+        snapshot = build_agent_graph(
+            agent=self,
+            context=AgentContext(
+                original_message="",
+                tools=[],
+            ),
+            initial_message=[],
+            max_tool_rounds=0,
+            checkpointer=self.checkpointer,
+        ).get_state(
+            {
+                "configurable": {
+                    "thread_id": thread_id,
+                },
+            }
+        )
+
+        if not snapshot.interrupts:
+            raise LookupError(
+                "no pending approval for this thread"
+            )
+
+        values = snapshot.values
+
+        if values["role"] != role:
+            raise ValueError(
+                "role changed since the run was paused"
+            )
+
+        context = AgentContext(
+            original_message=values["original_message"],
+            tools=values["tools"],
+            instructions=values["instructions"],
+        )
+
+        graph = build_agent_graph(
+            agent=self,
+            context=context,
+            initial_message=values["initial_message"],
+            max_tool_rounds=values["max_tool_rounds"],
+            role=values["role"],
+            checkpointer=self.checkpointer,
+            plan=values["plan"],
+            planning=values["planning"],
+            approval_required_tools=(
+                self.approval_required_tools
+            ),
+        )
+
+        return self._invoke(
+            graph=graph,
+            graph_input=Command(
+                resume={"approved": approved}
+            ),
+            config=self._graph_config(
+                max_tool_rounds=values["max_tool_rounds"],
+                thread_id=thread_id,
+            ),
+        )
+
+    def _graph_config(
+        self,
+        max_tool_rounds: int,
+        thread_id: str | None,
+    ) -> dict:
+
+        config = {
+            "recursion_limit": (
+                self.recursion_limit
+                or max(
+                    25,
+                    max_tool_rounds * 4 + 5,
+                )
+            ),
+        }
+
+        if thread_id is not None:
+            config["configurable"] = {
+                "thread_id": thread_id,
+            }
+
+        return config
+
+    def _invoke(
+        self,
+        graph,
+        graph_input,
+        config: dict,
+    ) -> AgentRunResult:
 
         try:
             result = graph.invoke(
-                initial_state,
+                graph_input,
                 config=config,
             )
 
@@ -425,6 +570,16 @@ class Agent:
             raise LLMError(
                 "Agent exceeded its step limit"
             ) from exc
+
+        if result.get("__interrupt__"):
+            raise ApprovalRequiredError(
+                thread_id=config["configurable"][
+                    "thread_id"
+                ],
+                tool_calls=result["__interrupt__"][
+                    0
+                ].value["tool_calls"],
+            )
 
         output_text = result["output_text"]
 
@@ -440,7 +595,9 @@ class Agent:
         return AgentRunResult(
             output_text=output_text,
             tools_used=list(result["tools_used"]),
-            used_rag_prompt=use_rag,
+            used_rag_prompt=result["used_rag_prompt"],
             recovery_count=result["recovery_count"],
-            plan=plan,
+            plan=result["plan"],
+            original_message=result["original_message"],
+            memory_key=result["memory_key"],
         )
