@@ -14,8 +14,8 @@ from rag.exceptions import RAGError
 from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from database import init_app_database
-from rag.database import init_rag_database
+from database import check_app_database, init_app_database
+from rag.database import check_rag_database, init_rag_database
 
 
 from exceptions import (
@@ -64,7 +64,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost", "http://localhost:3000"],
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -163,10 +163,46 @@ async def invalid_credentials_handler(
 
 @app.get("/health")
 def health():
+    """
+    Liveness: the process is up. Does not touch dependencies.
+    """
 
     return {
         "status": "ok"
     }
+
+
+@app.get("/ready")
+def ready():
+    """
+    Readiness: the dependencies needed to serve traffic respond.
+    """
+
+    checks = {}
+
+    for name, check in (
+        ("database", check_app_database),
+        ("rag_database", check_rag_database),
+    ):
+        try:
+            check()
+            checks[name] = "ok"
+        except Exception:
+            logger.exception("readiness check failed: %s", name)
+            checks[name] = "unavailable"
+
+    is_ready = all(
+        status == "ok"
+        for status in checks.values()
+    )
+
+    return JSONResponse(
+        status_code=200 if is_ready else 503,
+        content={
+            "status": "ready" if is_ready else "not_ready",
+            "checks": checks,
+        },
+    )
 
 
 

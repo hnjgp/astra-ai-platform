@@ -14,6 +14,11 @@ class Settings(BaseSettings):
     RATE_LIMIT_PER_MINUTE: int = 120
     AI_RATE_LIMIT_PER_MINUTE: int = 20
     LOG_LEVEL: str = "INFO"
+    # JSON list in the environment, e.g. ["https://app.example.com"]
+    CORS_ORIGINS: list[str] = [
+        "http://localhost",
+        "http://localhost:3000",
+    ]
 
     # Prices for the cost estimate in /metrics (USD per 1M tokens).
     # Set them to your provider's current prices.

@@ -73,3 +73,8 @@ def init_app_database() -> None:
         connection.exec_driver_sql(
             "CREATE INDEX IF NOT EXISTS ix_documents_owner_id ON documents (owner_id)"
         )
+
+
+def check_app_database() -> None:
+    with engine.connect() as connection:
+        connection.exec_driver_sql("SELECT 1")
